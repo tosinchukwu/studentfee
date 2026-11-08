@@ -1,0 +1,8 @@
+node_modules
+dist
+data
+.env
+.env.*
+.circle
+recovery_file*
+*.log

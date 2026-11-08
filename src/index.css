@@ -8,6 +8,33 @@
 
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
+  font-family: 'DM Sans', ui-sans-serif, sans-serif;
+  color: #1a2233;
+  background: #f6f4ee;
   min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-ink placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100;
+    min-height: 44px;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-slate-700;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}
+
+/* Keep the wallet picker above page content and readable on small screens. */
+.nws-modal-wrapper {
+  z-index: 60;
 }

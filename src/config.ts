@@ -1,6 +1,5 @@
 /**
- * wagmi configuration
- * Built with Arc Studio — https://studio.arc.io
+ * wagmi configuration (unused by the NEAR fee tracker)
  */
 
 import { http, createConfig } from 'wagmi'

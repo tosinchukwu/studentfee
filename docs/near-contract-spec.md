@@ -1,6 +1,8 @@
 # School Fee Registry: NEAR contract specification
 
 Status: final specification with your confirmed values. No contract code has been written.
+> Superseded: the deployed contract differs from this draft (extra statuses, separate settlement step). Use docs/near-contract-integration.md as the source of truth.
+
 
 ## 1. Goal
 A small, fixed (non-upgradeable) NEAR contract that registers school fee invoices and records a payment when a parent pays the exact amount in USDC. The USDC is forwarded straight to the school treasury. The contract never keeps funds.

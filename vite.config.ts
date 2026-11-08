@@ -29,6 +29,12 @@ export default defineConfig({
       'sonner',
       'clsx',
       'tailwind-merge',
+      '@near-wallet-selector/core',
+      '@near-wallet-selector/modal-ui',
+      '@near-wallet-selector/my-near-wallet',
+      '@near-wallet-selector/meteor-wallet',
+      '@near-wallet-selector/here-wallet',
+      '@near-js/transactions',
       'vite-plugin-node-polyfills/shims/buffer',
       'vite-plugin-node-polyfills/shims/global',
       'vite-plugin-node-polyfills/shims/process',
@@ -37,5 +43,8 @@ export default defineConfig({
   server: {
     allowedHosts: true,
     cors: true,
+    proxy: {
+      '/api': 'http://localhost:8787',
+    },
   },
 })
