@@ -1,214 +1,269 @@
-# Multi-school School Fee Registry: technical outline (v3 proposal)
+# Multi-school School Fee Registry: revised technical outline (v3)
 
-Status: proposal for your approval. Nothing here is implemented. The deployed contract `v2.studentfee.testnet` stays untouched.
+> Superseded in part: section 3 (accounting) and the stuck-operation rules are replaced by `docs/multi-school-final-spec.md`.
 
-## 0. Summary of the approach
+Status: revision 2, for your explicit approval. Nothing is implemented or deployed. The deployed contract `v2.studentfee.testnet` stays untouched.
 
-- Deploy a NEW contract (working name `v3.studentfee.testnet`, contract version 2.0.0) that keeps the existing payment state machine and adds schools, per-school treasuries and a platform fee.
-- One shared registry contract, not one contract per school. Funds from all schools briefly pass through one pooled USDC balance, so the contract is built around one invariant: it can never send out more than it holds for a given invoice.
-- Everything a school needs to list and search (student names, terms, CSVs) stays in the backend database, scoped by school. The chain stores only money state.
-- Old invoices stay on the old contract. The app reads both.
+## 1. Your decisions, applied
 
-### Main trade-off: shared registry versus one contract per school
-| | Shared registry (recommended) | Contract per school (factory) |
+| # | Decision | How it is applied |
 |---|---|---|
-| Isolation | By code and accounting | By NEAR account boundaries |
-| Cost per school | One registration | A sub-account, a deploy, a USDC registration, extra NEAR |
-| Platform fees | Easy, one place | Needs a fee path in every contract |
-| Complexity and time | Moderate | High (factory, upgrades, many accounts) |
-| Blast radius of a bug | All schools' in-flight payments | One school |
+| 1 | Owner approval for every school | New schools start as `PendingApproval` and cannot invoice or be paid until approved |
+| 2 | Platform fee starts at 1% | Default `fee_bps` = 100 |
+| 3 | Fee capped at 5% | Hard cap of 500 bps in the contract |
+| 4 | Fee deducted from the school's share | Parent pays exactly the invoice amount. School receives amount minus fee |
+| 5 | One treasury per school | Stored on the school, verified as registered with USDC before activation |
+| 6 | Treasury change delay | 24 hours on testnet. A longer delay for mainnet is a separate setting, chosen before any mainnet work |
+| 7 | One school per administrator | A unique admin-to-school index |
+| 8 | Keep supporting v2 | The app reads and pays v2 invoices through the old contract. v2 is never modified |
 
-Recommendation: the shared registry, with a strict solvency rule and an external audit before mainnet. A factory design is the hardening path if the product grows.
+Still open (see section 12): the platform owner account, where fees go, and the maximum invoice amount.
 
-## 1. How schools are registered
+## 2. Architecture overview
 
-- `register_school(name, description, treasury)` is callable by any account, attaching a NEAR deposit that covers storage. The caller becomes the school admin.
-- A school gets a sequential `school_id` (u64) and starts in status `PendingApproval`.
-- The platform owner calls `approve_school(school_id, fee_bps)`. Only `Active` schools can create invoices or receive payments.
-- Why approval instead of fully open: parents see the school name on the payment page. With open registration anyone could register "Springfield Academy" and collect real money. Approval is one cheap check that blocks that.
-- Stored per school: name (max 80 characters), description or location (max 200), admin, treasury, status, fee_bps, created_at.
-- One admin account maps to one school. This keeps scoping simple. A person who runs two schools uses two accounts.
-- The owner can `suspend_school` and `reactivate_school`. Suspension stops new invoices and new payments. It never touches funds already held, which can still be settled or refunded.
+- A new contract (working name `v3.studentfee.testnet`, contract version 2.0.0). Not upgradeable, like v2.
+- One shared registry. The trade-off against one contract per school is in section 8 (security).
+- Money state is on chain. Student names, terms, fee items, listings and CSV stay in the backend database, scoped by school.
+- Existing statuses are kept exactly: `Pending`, `PaymentReceived`, `Settling`, `Refunding`, `Paid`, `Cancelled`.
 
-## 2. Administrator and treasury per school
+## 3. Pooled USDC accounting (concern A)
 
-- Each school has its own admin and its own treasury account.
-- Treasury must be registered with USDC (storage deposit). Registering the treasury costs a NEAR storage deposit on the token. Note: your earlier notes said 1.25 NEAR. The value reported by the token for your existing accounts is 1250000000000000000000 yoctoNEAR, which is 0.00125 NEAR. Please double check what you actually paid.
-- `register_school` is payable and forwards that deposit to the token for the treasury. If the treasury is already registered, the token keeps or refunds it.
-- Admin transfer is two steps: `propose_admin(school_id, new_admin)` then the new admin calls `accept_admin`. This prevents handing a school to a mistyped account.
-- Treasury change is delayed: `queue_treasury_change(new_treasury)`, then `apply_treasury_change` after a waiting period (proposed: 24 hours on testnet, longer on mainnet). A stolen admin key cannot redirect money instantly, and the platform owner can cancel a pending change by suspending the school.
-- The treasury used for a payment is copied onto the invoice when the payment is received, so a change in between cannot redirect that payment.
+### 3.1 The problem
+All schools' payments sit in one USDC balance of the registry between "payment received" and "settled". NEAR runs a transfer as separate steps (a call, then a callback later), so the contract must never rely on the real balance alone. It keeps its own ledger and moves money between ledger buckets BEFORE sending, then confirms or restores in the callback.
 
-## 3. How each school creates, manages and cancels its invoices
+### 3.2 Ledger (all amounts in USDC base units, 6 decimals)
+- Per invoice: `status`, `amount`, `school_id`, `fee_bps` snapshot, `treasury` snapshot, `fee_amount`, `net_amount`, `payer`, `attempt_id`, `operation_started_at`.
+- `held_total`: the sum of `amount` for every invoice in `PaymentReceived`, `Settling` or `Refunding`. This is money that belongs to payers or schools and is still inside the contract.
+- `school_held[school_id]`: the same sum per school.
+- `fees_available`: platform fees earned and free to withdraw.
+- `fees_in_flight`: fees reserved by withdrawals that have been sent but not yet confirmed.
+- `withdrawals[withdrawal_id]`: amount and start time of each pending fee withdrawal.
 
-- `create_invoice(school_id, invoice_id, amount, due_date)`: caller must equal that school's admin and the school must be `Active`. The invoice stores `school_id` and a snapshot of the school's `fee_bps` at creation time.
-- `invoice_id` stays 32 lowercase hex characters, globally unique across schools. Creation fails if it already exists.
-- `cancel_invoice(invoice_id)`: the school is read from the stored invoice, never from caller input. Caller must be that school's admin and the invoice must be `Pending`.
-- Storage: every invoice costs the contract storage. Each school keeps a prepaid storage balance: `create_invoice` is payable or draws from a balance the admin topped up with `deposit_storage`. Unused deposit can be withdrawn. Without this a school could drain the contract's NEAR balance with invoice spam.
-- Listing, searching and filtering invoices stays off chain. Iterating over a school's invoices in a view call is unbounded and gets more expensive over time, so the contract exposes `get_invoice` and counters only.
+### 3.3 Rules (the invariants)
+- I1, at rest: real USDC balance >= `held_total` + `fees_available` + `fees_in_flight`. Stray tokens sent without a call make the balance larger. They are never paid out.
+- I2: `held_total` equals the sum of `school_held` over all schools.
+- I3: an invoice's money can leave the contract at most once. Both exits (settle and refund) start only from `PaymentReceived`, and both move the invoice out of that status before sending.
+- I4: every outgoing amount is read from the stored invoice (`net_amount` or `amount`) or from a stored withdrawal. Never from caller input.
 
-## 4. How payments are routed to the correct school treasury
+### 3.4 Payment received
+`ft_on_transfer` (called only by the configured USDC token) accepts only if the invoice is `Pending`, its school is `Active`, the contract is not paused and the amount equals the invoice amount exactly. Otherwise it returns the full amount and the token refunds the payer, as in v2.
+On acceptance, in one step: status `PaymentReceived`, store payer and treasury snapshot, compute `fee_amount = floor(amount * fee_bps / 10000)` and `net_amount = amount - fee_amount`, then `held_total += amount` and `school_held[school] += amount`. Fee is computed once here, so settlement never recomputes it.
 
-- The parent still calls `ft_transfer_call` on USDC with receiver = the registry and `msg` = invoice id. Nothing about the parent's step changes.
-- `ft_on_transfer` looks up the invoice by `msg`, then its school. It accepts only if the invoice is `Pending`, the school is `Active`, the sender token is the configured USDC and the amount equals the invoice amount. Otherwise it returns the full amount and the token refunds the parent (same as v2).
-- On acceptance the invoice becomes `PaymentReceived`, storing payer, treasury snapshot and a held-amount entry.
-- `settle_invoice(invoice_id)` stays permissionless, as in v2. It sends `amount - fee` to the stored treasury snapshot. The recipient is never taken from the caller.
-- The parent's page does not need to know the school. The backend maps invoice to school.
+### 3.5 Settlement during asynchronous execution
+1. `settle_invoice(id)` (anyone) requires `PaymentReceived`. In the same call, before any promise: status `Settling`, `attempt_id += 1`, `operation_started_at = now`. It checks `school_held[school] >= amount` and `held_total >= amount` and panics otherwise. Then it sends `ft_transfer(treasury_snapshot, net_amount)` and attaches the callback `on_settlement_complete(id, attempt_id)`. NEAR keeps state changes and the promise together, or neither.
+2. While `Settling`, a second `settle_invoice`, a `refund_payment` or a `cancel_invoice` all fail the status check. This is what stops a double payout: there is no path from `Settling` to another send.
+3. The private callback first checks `status == Settling` and `attempt_id` matches. If not, it is stale and does nothing.
+4. Transfer succeeded: status `Paid`, `held_total -= amount`, `school_held[school] -= amount`, `fees_available += fee_amount`.
+5. Transfer failed (for example the treasury lost its USDC registration): status back to `PaymentReceived`. Nothing was sent, ledgers unchanged, and the admin can fix the treasury or refund.
+6. The risky case is "transfer succeeded but the callback never ran" (out of gas or lost). The invoice stays `Settling`. It cannot be settled again. Only `resolve_stuck_operation` by the platform owner can clear it, only after a minimum waiting time (proposed 10 minutes), after checking the transaction outcome off chain, and it bumps `attempt_id` so any late callback is ignored. The callback does only cheap state updates and is given generous gas to make this very unlikely.
 
-## 5. How platform fees are collected
+### 3.6 Refund
+`refund_payment(id)` by that school's admin, only from `PaymentReceived`. Same pattern: status `Refunding`, `attempt_id += 1`, send the full `amount` to the payer, callback. Success: invoice back to `Pending` (as in v2), ledgers decreased, no fee taken. Failure: back to `PaymentReceived`. Fees accrue only on a successful settlement, so a refund never has a fee to claw back.
 
-- Model (proposal): the parent pays exactly the invoice amount. The fee is deducted from the school's share.
-  - `fee = amount * fee_bps / 10000`, rounded down. Cap `fee_bps` at 500 (5 percent) in the contract so the owner cannot set an extreme value.
-  - Example: a 250.00 invoice at 100 bps gives a 2.50 fee. The school receives 247.50.
-- Mechanism: settlement sends only the net amount to the school treasury, in one transfer, exactly like v2. The fee simply stays in the registry's USDC balance and is added to `accrued_fees` when the settlement succeeds.
-- `withdraw_fees(amount)`: owner only, sends to the platform treasury, using the same attempt-and-callback pattern as settlement, and restores `accrued_fees` if the transfer fails.
-- Why not send school and platform shares in one settlement: two transfers are not atomic. One could succeed and the other fail, leaving the invoice in a state that needs manual recovery. A single transfer plus an internal counter avoids that.
-- Alternative: add the fee on top of the invoice amount. Parents would pay more than the invoice shows, which is bad for a school fee. Not recommended.
-- Fee rate: set per school at approval and snapshotted on each invoice, so changing a rate never alters issued invoices.
+### 3.7 Why one school's funds are protected
+- A school payout needs `school_held` for that school to cover the invoice. A bug that tried to pay one invoice twice would find the second payout missing from the ledger and panic.
+- Paths are mutually exclusive per invoice (I3), and recipients are snapshots, never parameters.
+- This is defense in depth, not a proof. Section 8 covers what happens if there is still a bug.
 
-## 6. Preventing one school from touching another school's data
+## 4. Treasury registration (concern B)
 
-On chain:
-- Every state-changing school method derives the school from the stored invoice and compares it to the caller. `cancel_invoice` and `refund_payment` take only an invoice id.
-- `create_invoice` takes a `school_id` but rejects unless the caller is that school's admin.
-- A school admin has no way to name another school's treasury. Treasuries are only changed through the delayed change on their own school.
-- `resolve_stuck_operation` becomes platform-owner only (it is admin-only in v2). In a pooled contract a school admin could otherwise claim a settlement succeeded or failed and trigger a double payout from other schools' funds.
-- Solvency rule: the contract tracks `held_total` (the sum of all invoice amounts in `PaymentReceived`, `Settling` or `Refunding`) plus `accrued_fees`. Every outgoing transfer is for an exact amount derived from one invoice, never from caller input, and a state change prevents repeating it. A view `solvency()` returns the tracked total so monitoring can compare it with the contract's real USDC balance.
+### 4.1 Design choice
+The registry does not handle the treasury's USDC registration deposit at all. The school admin registers the treasury with USDC directly, from their own wallet, and the registry only VERIFIES it. That keeps NEAR deposits out of the registry, so no refund bookkeeping can go wrong.
 
-Off chain (backend and database):
-- Every table has `school_id`. Every admin query is `WHERE school_id = <school of the signed-in account>`, never a school id from the request.
-- Sign-in is still a signed message from the wallet. The session stores the account and the one school it administers.
-- The public invoice endpoint returns only that single invoice and only the fields a parent needs.
-- Exports contain only the signed-in school's rows.
+### 4.2 Flow
+1. The dashboard checks the treasury with `storage_balance_of` on USDC.
+2. Not registered: the admin presses Register treasury, which calls `storage_deposit` on USDC with `account_id` = treasury and `registration_only = true`. The amount comes from the token's `storage_balance_bounds` minimum, read live, not hardcoded.
+3. `register_school(name, description, treasury)` is payable, attaching only the registry's own storage cost for the school record (measured, see section 7).
+4. The contract calls `storage_balance_of(treasury)` on USDC and handles the answer in a callback.
+5. Registered (non-null): the school record is kept in `PendingApproval` with `treasury_verified = true`.
+6. Not registered: the record is not kept, and the full attached deposit is returned to the caller.
+7. `approve_school` (owner) re-checks the same way and only sets `Active` in its callback if still registered. An account can unregister between registration and approval.
 
-## 7. Refunds and settlements
+### 4.3 The cases you asked about
+| Case | Result |
+|---|---|
+| Treasury already registered | Step 2 is skipped, or if called anyway the token refunds the whole deposit to the caller. Verification passes |
+| Insufficient deposit | The token rejects the call. NEAR returns the attached amount to the caller. Nothing changes |
+| Registration fails | Treasury stays unregistered, so `register_school` fails verification and returns its deposit |
+| Excess deposit | The token refunds the excess to the caller, who is the admin and not the registry |
+| Registered but later unregisters | Settlement transfer fails, invoice returns to `PaymentReceived`, funds safe, refund available |
+| Treasury change | `queue_treasury_change` and `apply_treasury_change` both verify registration |
+| Registry's own USDC registration | A one-time step after deployment, checked by the setup health check |
 
-State machine (statuses stay exactly as the deployed contract names them):
+A school is `Active` only when the verification callback succeeded at approval time. There is no other path to `Active`.
 
-`Pending` to `PaymentReceived` to `Settling` to `Paid`; `PaymentReceived` to `Refunding` to `Pending`; `Pending` to `Cancelled`.
+## 5. Platform fee withdrawal (concern C)
 
-- Settlement: permissionless, one transfer of the net amount to the treasury snapshot, with an `attempt_id` so stale callbacks are ignored. On success the invoice becomes `Paid`, `accrued_fees` increases and `held_total` decreases. On failure it returns to `PaymentReceived`.
-- Refund: `refund_payment(invoice_id)` by that school's admin, only from `PaymentReceived` (for example after settlement keeps failing because a treasury lost its USDC registration). The full amount returns to the payer and no fee is taken, because no fee is accrued before a successful settlement.
-- Refund after `Paid`: not possible on chain, because the money has left the contract. A school that wants to give money back sends it from its own treasury. The dashboard records this as a note, not as an on-chain refund.
-- Stuck operations (a settlement or refund that never reports back): `resolve_stuck_operation` by the platform owner only, after checking the transaction outcome, same meaning as v2.
+- Fees are a separate bucket: `fees_available`. They enter it only after a successful settlement and leave it only through `withdraw_fees`.
+- Schools never touch `fees_available`. School payouts are computed from invoice records, not from the balance, so fees cannot be spent on payouts and payouts cannot dip into fees.
+- `withdraw_fees(amount)` (owner only, not while a withdrawal is being resolved by hand): requires `amount <= fees_available`. Before sending: `fees_available -= amount`, `fees_in_flight += amount`, store `withdrawals[id]`. Then `ft_transfer` to the platform treasury with callback `on_withdraw_complete(id)`.
+- The callback removes `withdrawals[id]` first, so it can run only once. Success: `fees_in_flight -= amount`. Failure: `fees_in_flight -= amount` and `fees_available += amount`. The fees are never both available and in flight.
+- Stuck withdrawal: `resolve_stuck_withdrawal(id, succeeded)` by the owner after a waiting time and an off-chain check, with the same effect as the callback.
+- The platform treasury is verified as USDC-registered when it is set.
 
-## 8. Required changes
+## 6. Payment flow, updated end to end
 
-Contract (new code, new account):
-- New state: owner, platform treasury, USDC token, default fee, schools, admin-to-school index, invoices (with `school_id`, fee and treasury snapshots), `held_total`, `accrued_fees`, per-school storage balances.
-- New methods: `register_school`, `approve_school`, `suspend_school`, `reactivate_school`, `propose_admin`, `accept_admin`, `queue_treasury_change`, `apply_treasury_change`, `deposit_storage`, `withdraw_fees`, owner transfer in two steps, and views for schools, solvency and fees.
-- Changed methods: `create_invoice`, `cancel_invoice`, `refund_payment`, `ft_on_transfer`, `settle_invoice`, `resolve_stuck_operation`.
-- Events for school registered, approved, suspended, treasury changed, invoice created, paid, cancelled and fee withdrawn.
-- Not upgradeable, like v2. The new account must itself be registered with USDC once.
+1. School registers its treasury with USDC, then calls `register_school`. Owner approves. School is `Active`.
+2. Admin creates the invoice in the dashboard (backend draft), then `create_invoice` on v3. Fee rate is snapshotted.
+3. Parent opens the link `/pay/<id>`. The backend returns the invoice and its `contract_id`. Parent calls `ft_transfer_call` on USDC (receiver = that contract, msg = invoice id). Invoice becomes `PaymentReceived`.
+4. Anyone calls `settle_invoice`. The school treasury receives the net amount. Invoice is `Paid`. The fee is added to `fees_available`.
+5. The owner withdraws fees to the platform treasury when wanted.
 
-USDC integration:
-- Same token. The registry account changes, so `ft_transfer_call` receiver becomes the new contract for new invoices.
-- Every school treasury and the platform treasury must be registered with USDC.
-- Old invoices keep paying into the old contract. The backend stores a `contract_id` per invoice, so the pay page uses the right receiver.
+## 7. Storage accounting (concern F)
 
-Backend and database:
-- New `schools` table (school_id, name, description, admin account, treasury cache, status, fee rate). `invoices` gets `school_id` and `contract_id`. Sessions get the account and school.
-- School name moves from a global setting to a per-school field.
-- Sign-in resolves account to school. Unknown accounts see a Register your school screen. Platform owner sees the owner console.
-- Chain reads query the contract named on each invoice.
+Correction: `1250000000000000000000` yoctoNEAR equals 0.00125 NEAR (1 NEAR = 10^24 yoctoNEAR), not 1.25 NEAR. That is the minimum USDC storage balance the token reported for both the v2 contract and your treasury. The earlier notes mislabeled it.
 
-Dashboard:
-- School registration form (name, description or location, treasury) and an Awaiting approval state.
-- Admin dashboard scoped to the school: invoices, filters, CSV with extra columns for gross amount, platform fee and net to school.
-- Treasury and admin change screens with the waiting period shown.
-- Owner console: approve and suspend schools, set fee rates, see accrued fees, withdraw fees, and a solvency check.
+How storage will be accounted for in v3:
+- NEAR charges 10^19 yoctoNEAR per byte stored, so 1 NEAR pays for about 100 KB.
+- USDC registration of an account (treasury, platform treasury, the registry itself): the token's minimum, read live from `storage_balance_bounds`. Reported value today: 0.00125 NEAR each. It is paid once per account, directly to the token.
+- School record (name, description, admin, treasury and ledger fields): a few hundred bytes. Roughly 0.003 NEAR as an estimate only. The real figure is measured in tests from the change in `env::storage_usage()` and then used as the required deposit.
+- Invoice record: also a few hundred bytes. Roughly 0.0025 NEAR as an estimate only, measured the same way.
+- Each school keeps a prepaid storage balance in the registry (`deposit_storage`). `create_invoice` charges the measured storage cost to that balance and fails if it is too low. Unused balance can be withdrawn by the school admin. This stops one school from draining the registry's NEAR by creating invoices.
+- The registry account must keep a NEAR balance above its storage requirement. The health check warns when it is low.
+- The 0.00125 NEAR figure is for the token's own records. It is separate from the registry's storage and must not be mixed up with it in the code or the dashboard.
 
-## 9. Security risks and handling
+## 8. Security (concern D)
 
+### 8.1 What a shared registry means
+- Funds of different schools share one USDC balance while a payment is waiting to be settled. A serious bug in payment, settlement, refund or fee code can affect every school's in-flight money and the accrued fees, not just one school.
+- Because the contract is not upgradeable, a bug cannot be patched in place. The response is to pause, refund and redeploy.
+- Money already settled is in school treasuries, outside the registry, and is not affected.
+- Exposure is limited to: invoices in `PaymentReceived`, `Settling` or `Refunding`, plus `fees_available` and `fees_in_flight`.
+
+### 8.2 Shared registry versus one contract per school
+| | Shared registry (chosen) | Contract per school |
+|---|---|---|
+| Worst-case bug | All in-flight funds and fees | One school's in-flight funds |
+| Setup per school | One registration | Account, deploy, USDC registration, extra NEAR |
+| Fees and owner tools | One place | Repeated in every contract |
+| Time to build | Shorter | Much longer |
+
+### 8.3 Controls that limit the damage
+- Pause switch (owner): blocks new payments, new invoices, settlement and fee withdrawal. Refunds and cancellations stay allowed so payers can always get their money back.
+- Held-funds cap (`max_held_total`) and a maximum invoice amount, set at deployment, so the loss from any bug is bounded. Values to be agreed (section 12).
+- Prompt settlement keeps the pool small. Anyone can settle, so the app prompts the payer at once. An optional platform-run settle service can sweep `PaymentReceived` invoices.
+- Frequent fee withdrawals keep `fees_available` small.
+- Solvency view and monitoring: compare tracked ledgers with the real USDC balance when no settlement or refund is in flight.
+- Owner account is a multisig. Two-step ownership transfer.
+- `resolve_stuck_operation` and `resolve_stuck_withdrawal` are owner-only with waiting times, because a school admin must never decide whether money left the pool.
+- Independent audit before any mainnet use. Testnet first.
+
+### 8.4 Risk table
 | Risk | Handling |
 |---|---|
-| A bug lets one invoice send more than it holds, draining other schools' pooled funds | Single-purpose transfers from stored amounts, status guards, `attempt_id`, held-total tracking, external audit before mainnet |
-| Fake school impersonates a real one | Approval step before a school can invoice or be paid |
-| Admin key stolen, treasury redirected | Delayed treasury change, owner can suspend |
-| Owner key stolen | Owner can only approve schools, set fees under a hard cap and withdraw accrued fees. It cannot touch held school funds. Use a multisig account for the owner |
-| School admin abuses stuck-operation recovery | Recovery is owner-only |
-| Treasury not registered with USDC | Registration is forwarded at school registration. Settlement failure leaves funds safely in `PaymentReceived`, refundable |
-| Storage drain by invoice spam | Prepaid per-school storage balance |
-| Fee rounding errors | Round down, fee never exceeds the amount, tested at boundaries |
-| Cross-school data access in the app | School derived from the session on the server, never from request parameters |
-| Race: two payments on one invoice | Existing `PaymentReceived` guard and exact-amount rule. Needs a real simultaneous-payment test, which has not been done on v2 either |
-| Callback arrives late or twice | `attempt_id` check |
-| Suspension mid-flight | Held funds can still settle or be refunded |
-| Lost owner or admin accounts | Two-step transfers. Recovery plan to be agreed |
+| Double payout of one invoice | Status transitions before sending, attempt ids, exclusive exits, per-school ledger check |
+| Late or repeated callback | `attempt_id` and status check, withdrawals removed on first callback |
+| Fake school impersonating a real one | Owner approval |
+| Admin key stolen | 24-hour treasury change delay, owner can suspend |
+| Owner key stolen | Owner can approve schools, set fees under the cap, pause, withdraw fees. It cannot move school funds in flight. Multisig |
+| Pause abused | Refunds stay possible |
+| Storage spam | Prepaid per-school storage balance |
+| Treasury unregistered later | Settlement fails safely, refundable |
+| Rounding | Floor, fee never above amount, tested at boundaries |
+| Cross-school data access in the app | School comes from the signed session on the server, never from request parameters |
+| Same invoice paid by two parents at once | `PaymentReceived` guard and exact amount. Needs a real test, not yet done for v2 either |
 
-## 10. Test cases required before deployment
+## 9. Migration and v2 support (concern E)
 
-Contract unit and integration tests:
-- Registration: any account can register, duplicate admin rejected, name length limits, storage deposit required, treasury registration forwarded.
-- Approval and suspension: only owner, fee cap enforced, suspended school cannot invoice or receive new payments, held funds still settle.
-- Admin and treasury: two-step admin transfer, wrong account cannot accept, treasury change waits and can be cancelled, snapshot used for in-flight payments.
-- Invoices: only that school's admin can create, cancel and refund, cross-school attempts rejected for every method, duplicate ids rejected, cancel only from Pending.
-- Payments: exact amount accepted, under and over payment fully refunded, wrong token rejected, unknown invoice refunded, suspended school refunded, second payment on one invoice refunded.
-- Settlement: correct net to the correct treasury, fee accrued, failed transfer restores `PaymentReceived`, stale callback ignored, permissionless call cannot change the recipient.
-- Fees: rounding at 1 unit and at the cap, zero fee, snapshot unaffected by later rate changes, `withdraw_fees` owner only and restored on failure.
-- Refunds: only from `PaymentReceived`, full amount, no fee taken, not possible after `Paid`.
-- Solvency: after random sequences of operations across several schools, the tracked total equals the real USDC balance.
-- Simultaneous payments for one invoice, on a sandbox or testnet.
+Principle: a payment link is only an invoice id. It stays the same.
 
-Application tests:
+- Database: `invoices` gets `contract_id` (existing rows are set to `v2.studentfee.testnet`) and `school_id` (null for v2). A `schools` table holds v3 schools. v2 invoices belong to a built-in "legacy school" row tied to `mouseng20.testnet`.
+- Link resolution: `/pay/<id>` calls the backend, which finds the invoice and returns its `contract_id` and version. The pay page uses that contract as the `ft_transfer_call` receiver and for `settle_invoice`. Old links keep working with no change.
+- Contract adapters in the app: one for v2 and one for v3, each providing read invoice, create, cancel, settle and refund with that version's argument shapes and status fields. Pages talk to the adapter, not to a specific contract.
+- Creation: new invoices go to v3 only. The legacy school can still cancel, settle and refund existing v2 invoices.
+- Dashboard: one combined list with a quiet version tag. A signed-in account sees its v3 school and, for `mouseng20.testnet`, the legacy invoices.
+- Fees: v2 pays 100% to its treasury with no platform fee. The CSV gets Gross, Platform fee and Net columns, filled for v3 and showing a fee of 0 for v2, plus a Contract column.
+- Sessions and API: the server checks the account against the contract named on each invoice before allowing an action.
+- Sunset: when no v2 invoice remains open, v2 support can be removed in one change.
+- The v2 contract is read and called, never modified.
+
+## 10. Required changes by area
+
+Contract: new state and methods (`register_school`, `approve_school`, `suspend_school`, `reactivate_school`, `propose_admin`, `accept_admin`, `queue_treasury_change`, `apply_treasury_change`, `deposit_storage`, `withdraw_storage`, `withdraw_fees`, `set_fee_default`, `set_school_fee`, `pause`, `unpause`, owner transfer, the two stuck-resolution methods, and views for schools, ledgers and solvency). Changed methods: `create_invoice`, `cancel_invoice`, `refund_payment`, `ft_on_transfer`, `settle_invoice`. Events for every state change.
+
+Backend: per-school scoping on every query, account to school resolution at sign-in, owner endpoints, contract adapters, per-invoice `contract_id`, fee and net fields cached from chain events.
+
+Database: `schools` table, `school_id` and `contract_id` on invoices, per-school settings including the school name.
+
+Dashboard: school registration with treasury check, awaiting-approval state, treasury and admin change screens with the 24-hour countdown, storage balance top-up, platform owner console (approve, suspend, fee rates, pause, ledgers, solvency, withdraw fees), CSV with fee columns.
+
+USDC integration: same token. New registry account must be registered with USDC once. Every treasury and the platform treasury must be registered. Payments for new invoices go to the v3 account, for old invoices to v2.
+
+## 11. Test cases required before deployment
+
+Accounting:
+- After every payment, settlement, refund, failure and withdrawal step: `held_total` equals the sum of `school_held`, and the tracked total never exceeds the real balance when nothing is in flight.
+- Settlement and refund on the same invoice, called together: only one starts.
+- Settle twice in a row: the second fails while `Settling`.
+- Callback replay and stale `attempt_id`: ignored.
+- Forced transfer failure: invoice returns to `PaymentReceived`, ledgers unchanged.
+- Callback missing: invoice stays `Settling`, cannot be re-settled, owner recovery works only after the waiting time and invalidates late callbacks.
+- Fee withdrawal success, failure and replay: `fees_available` and `fees_in_flight` correct each time, withdrawing more than available fails, school payouts unaffected.
+- Several schools with interleaved payments: each school's payout equals its own invoices minus fees.
+
+Treasury and schools:
+- Treasury already registered, unregistered, insufficient deposit, excess deposit, and unregistered between registration and approval. School is never `Active` without verification.
+- Approval, suspension, reactivation: owner only. Suspended school cannot invoice or receive new payments, held funds still settle.
+- One school per admin enforced. Two-step admin transfer. Treasury change waits 24 hours, can be cancelled, re-verifies at apply, does not affect in-flight payments.
+
+Invoices and payments:
+- Only the school's own admin can create, cancel and refund. Cross-school attempts on every method fail.
+- Exact amount accepted, under and over payment fully refunded, wrong token rejected, unknown invoice refunded, paused contract refunds.
+- Fee rounding at 1 unit, at the 5% cap and at zero. Fee rate change affects only new invoices.
+- Storage: invoice creation charges the measured amount, fails when the prepaid balance is too low, withdrawal of unused balance works.
+- Pause blocks payments and settlement but not refunds or cancellations.
+- Two payments for one invoice at the same moment, on testnet.
+
+Application:
 - Admin of school A cannot read, export, cancel or refund school B's invoices through the API.
 - Public invoice endpoint exposes only that invoice.
-- A legacy v2 invoice still loads and pays through the old contract.
-- Registration to approval to first paid invoice, end to end with real wallets on testnet.
-- CSV columns and totals match the chain for a mixed set of paid, pending and cancelled invoices.
+- A v2 invoice link created before the upgrade still loads and pays through v2. A v3 link pays through v3.
+- Registration, approval and first paid invoice end to end with real wallets.
+- CSV totals, fees and nets match the chain for a mixed set of v2 and v3 invoices.
 
-## 11. Decisions I need from you
+## 12. Open items I still need from you
 
-1. Registration: approval by the platform owner (recommended) or fully open?
-2. Fee: percentage deducted from the school's share (recommended), or something else? Starting rate, for example 1 percent? Is the cap of 5 percent acceptable?
-3. Treasury change waiting period: 24 hours on testnet and longer on mainnet?
-4. One school per admin account (recommended)?
-5. Who is the platform owner account, and where should platform fees be sent?
-6. Should the app keep supporting the existing v2 contract for old invoices, or can the demo start fresh on v3?
+1. Platform owner account (preferably a multisig account) and the platform treasury that receives fees.
+2. Maximum invoice amount and the held-funds cap for testnet.
+3. Minimum waiting time before a stuck operation can be resolved (proposed 10 minutes).
+4. Whether the platform should run an automatic settle service, which would need a platform-owned funded account key kept outside this app.
+5. Mainnet treasury-change delay. This is not set now, and no mainnet configuration is written in this outline.
 
-## 12. Suggested order of work (after your approval)
+## 13. Suggested order of work (after your approval)
 
-1. You confirm the decisions above and I update this outline into a final specification.
-2. Your NEAR developer implements and tests the v3 contract from that specification, and deploys it to testnet under a new account.
+1. You answer section 12. I turn this outline into the final specification.
+2. Your NEAR developer implements and tests v3 from that specification and deploys to a new testnet account.
 3. I review the contract against the specification and the app.
-4. I update the database, backend and dashboard, then run the full test list on testnet.
+4. I add the adapters, database and dashboard changes and run the application tests on testnet.
 
 
-my need feedback 
+chevk ou
 
- The proposed architecture is acceptable in principle. I want to proceed with the shared multi-school registry, but please revise the outline before implementation.
+The revised outline is much better. I agree with the overall architecture.
 
-My decisions:
+Before final approval, I need one more technical correction and clarification.
 
-1. School registration must require platform owner approval.
-2. Initial platform fee should be 1%.
-3. Maximum platform fee should be capped at 5%.
-4. Fees should be deducted from the school's payment, not added to the parent's invoice.
-5. Each school must have its own treasury.
-6. Treasury changes should have a 24-hour delay on testnet and a longer delay on mainnet.
-7. One school per administrator account.
-8. Continue supporting existing v2 invoices and payments. Do not modify the deployed v2 contract.
+1. Pooled accounting:
+   Please introduce an explicit school payout in-flight accounting bucket, or an equivalent safe mechanism.
 
-Please address these additional concerns:
+When settlement sends the school's net amount but the callback has not yet executed, the actual USDC balance has already decreased while held_total has not yet been updated.
 
-A. Pooled USDC accounting:
-Explain how held_total, accrued_fees and pending outgoing transfers will be accounted for during asynchronous NEAR promise execution. Demonstrate how the contract prevents double payouts and protects each school's funds.
+Explain exactly how the ledger remains correct during this period, including successful transfers, failed transfers, and callbacks that never execute.
 
-B. Treasury registration:
-Explain how the contract handles already-registered treasuries, insufficient deposits, failed storage registration and refunded excess deposits. A school must not become Active unless its treasury registration is verified.
+2. Stuck-operation recovery:
+   Explain how resolve_stuck_operation prevents double payouts if the owner supplies an incorrect operation_succeeded value. Include safeguards and detailed recovery tests.
 
-C. Platform fee withdrawal:
-Explain how accrued fees are protected from school funds and how failed fee withdrawals are recovered safely.
+3. Apply these proposed testnet settings:
 
-D. Security:
-Explain the implications of using one shared registry for all schools, including the consequences of a contract bug.
+- Platform owner: mouseng20.testnet, subject to wallet ownership verification.
+- Platform fee treasury: a separate dedicated NEAR account, to be created.
+- Maximum invoice amount: 1,000 USDC.
+- Maximum held funds: 5,000 USDC.
+- Stuck-operation waiting period: 10 minutes.
+- Automatic settlement service: Yes, but implement it only after the core contract has passed its testnet integration tests.
 
-E. Migration:
-Explain how the application will support both v2 and v3 without breaking existing invoice payment links.
+The limits above are for testnet and must be reviewed before mainnet.
 
-F. Storage accounting:
-Correct the storage deposit calculation. The previously reported minimum of 1250000000000000000000 yoctoNEAR equals 0.00125 NEAR.
+Do not implement or deploy anything yet.
 
-Do not write code or deploy anything yet.
-
-Return the revised technical outline, including the updated accounting model, payment flow, security assumptions and test cases. Wait for my explicit approval before implementation.
+Return the corrected accounting model, explain the stuck-operation safeguards, and provide the final specification for review.
