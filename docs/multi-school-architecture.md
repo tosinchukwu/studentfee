@@ -1,4 +1,5 @@
 # Multi-school School Fee Registry: revised technical outline (v3)
+> Superseded: see docs/multi-school-final-spec.md.
 
 > Superseded in part: section 3 (accounting) and the stuck-operation rules are replaced by `docs/multi-school-final-spec.md`.
 

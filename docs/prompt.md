@@ -1,227 +1,164 @@
-prompt 2
-Proceed and build the full core application now.
+I have completed my review of the v3 specification. Rather than continue making individual corrections, I want us to settle the architecture now.
 
-Must include:
-1. School Admin dashboard
-   - Create new invoice form
-   - List of all invoices with status
-   - Copy payment link button
-   - CSV export button
+Please treat the following as my definitive design decisions and update the entire v3 specification accordingly.
 
-2. Public payment page (the link the parent receives)
-   - Clear invoice details
-   - Amount and due date
-   - Pay with USDC button
-   - Status feedback after payment
+Do not implement, modify code, or deploy anything yet. Return the complete corrected specification for my final review.
 
-3. Working end-to-end flow on testnet:
-   Create invoice → get payment link → pay with USDC → status updates to Paid → appear in admin dashboard and CSV
+1. Invoice reuse and payment snapshots
 
-Strict rules:
-- Absolutely no “Built with Arc Studio”, Circle, or Arc branding, floating buttons, badges, or watermarks anywhere in the UI.
-- Clean professional design only.
-- No seed phrases or complex wallet UX if avoidable.
+A successfully refunded invoice must never accept another payment.
 
-After the core happy path works, show me:
-- The admin dashboard
-- The public payment page
-- Confirmation that a test payment updates status correctly
+Please introduce a terminal "Refunded" status.
 
+The lifecycle should be:
 
-prompt 3
-Add proper multi-school support and design the smart contract carefully.
+- "Pending" → "PaymentReceived" → "Settling" → "Paid".
+- "Pending" → "PaymentReceived" → "Refunding" → "Refunded".
+- An ordinary failed settlement or refund, confirmed by its callback, returns to "PaymentReceived".
+- A recovered settlement follows only the settlement recovery path.
+- A recovered refund follows only the refund recovery path.
 
-Context:
-- Final target chain is NEAR (testnet first, then mainnet).
-- We are using Arc Studio now for fast prototyping of the UI and payment logic.
-- Therefore the contract must be structured so the same business logic is easy to re-implement later as a NEAR smart contract.
+"ft_on_transfer" must accept payments only for invoices in "Pending".
 
-### Multi-School Requirements
+A "Refunded", "Paid" or "Cancelled" invoice cannot be reused. If another payment is required, the school creates a new invoice with a new ID.
 
-1. School Registration
-   - Anyone can register a new school (or we can restrict it later).
-   - When registering, collect:
-     - School name
-     - School admin address / wallet
-     - Optional short description or location
-   - Each school gets a unique schoolId
+The original payment snapshot is immutable for the entire lifetime of that invoice.
 
-2. School ownership & access control
-   - Only the registered school admin can create invoices for that school
-   - Only the school admin can view the full list of invoices and export CSV for their school
-   - Parents only see the specific invoice they are paying
+This removes the ambiguity around replacing the payer, payment amount and other snapshot fields after a successful refund.
 
-3. Invoices belong to a school
-   - Every invoice must be linked to a schoolId
-   - Payment page should still work with a simple public link (no need for the parent to know the schoolId)
+2. Remove reclaim_surplus
 
-4. Admin experience
-   - After connecting wallet, the admin should see only their own school’s invoices
-   - Clear “Create Invoice” flow that is already scoped to their school
+Remove "reclaim_surplus", its maintenance-mode requirements, its balance-reading procedure and all tests that depend on it.
 
-### Contract Structure Instructions (Very Important)
+Reason: the contract holds USDC in a pooled balance. It cannot reliably identify the source of individual surplus amounts. Even if the total balance is above the recorded liabilities, that does not prove that the surplus belongs to the platform rather than a school whose invoice was incorrectly closed.
 
-Design the contract with clean, portable logic so we can later rewrite it for NEAR:
+I prefer permanently locking unidentifiable surplus rather than risking school funds.
 
-Recommended structure:
+Consequently:
 
-- Schools mapping / table:
-  - schoolId → { name, admin, createdAt, isActive }
+- Collateral committed through "retry_with_collateral" is not replenished.
+- "unreconciled_collateral" becomes a monotonically increasing lifetime counter.
+- The global maximum remains 1,000 USDC for testnet.
+- Every collateral-backed recovery must satisfy both the available "FA" requirement and the lifetime collateral cap.
+- The per-invoice limit remains two collateral-backed recoveries.
+- No method may withdraw or reclaim stranded surplus.
 
-- Invoices mapping / table:
-  - invoiceId → {
-      schoolId,
-      studentName,
-      studentId (optional),
-      term,
-      amount,
-      dueDate,
-      status (Pending / Paid / Refunded),
-      payer (optional),
-      paidAt,
-      paymentTxHash or reference
-    }
+Please update the accounting invariants and tests to reflect this conservative approach.
 
-- Core functions (keep them simple and clear):
-  - registerSchool(name) → returns schoolId
-  - createInvoice(schoolId, studentName, term, amount, dueDate, ...) → returns invoiceId
-  - getInvoice(invoiceId)
-  - getSchoolInvoices(schoolId)
-  - markAsPaid(invoiceId, paymentReference)  (or have payment automatically update status)
-  - Only school admin can call createInvoice and view full school data
+3. Separate the attempt counter from the operation record
 
-Design principles for portability to NEAR:
-- Prefer simple state and clear functions over complex inheritance
-- Use events / logs for important actions (SchoolRegistered, InvoiceCreated, InvoicePaid)
-- Keep access control explicit (msg.sender / predecessor checks)
-- Avoid heavy use of EVM-specific patterns that would be hard to translate
-- Comment the contract clearly so a developer can later rewrite the same logic in a NEAR contract (Rust or AssemblyScript)
+Please redesign these fields clearly.
 
-### UI Requirements for Multi-School
+Use an invoice-level "attempt_counter" that:
 
-- Registration page or modal for new schools
-- After registration, the admin lands on their school dashboard
-- Dashboard only shows invoices belonging to their school
-- Payment links remain simple public URLs
+- Only increases.
+- Is never reset or reused.
+- Increments for every new transfer attempt.
+- Also increments when a frozen operation is closed or recovered, invalidating any earlier callback.
 
-### Strict Rules
+Keep a separate operation record containing:
 
-- Do NOT add any “Built with Arc Studio”, Circle, or Arc branding, floating buttons, badges, or watermarks.
-- Keep the UI clean and professional (school admin software style).
-- Prefer clarity and simplicity over cleverness in the contract.
+- "op_type"
+- "op_recipient"
+- "op_amount"
+- The current active attempt ID, where applicable.
 
-First outline:
-1. The updated data model (Schools + Invoices)
-2. The main contract functions
-3. How access control will work
-4. How the frontend will handle school registration and scoping
+The operation type, recipient and amount remain pinned throughout a frozen or recovered operation.
 
-Then wait for my approval before implementing the changes.
+A restart must use the same operation type, recipient and amount but receive a new attempt ID.
 
-prompt 4
-Audit the entire frontend for any Arc Studio, Circle, or third-party branding.
+A callback may change state only when its invoice ID, attempt ID, operation type and expected status all match.
 
-Remove:
-- Any floating “Built with Arc Studio” button
-- Any Circle or Arc logos
-- Any watermarks
-- Any promotional text or badges
-- Any footer that mentions Arc Studio or Circle
+When an ordinary failure callback confirms that a transfer did not execute, clear the operation record and return the invoice to "PaymentReceived". The next settlement or refund decision receives a fresh attempt ID.
 
-Make the UI look like a normal school fee management tool. Keep it clean, professional, and free of any builder branding.
+Please ensure that "close_as_sent" and "retry_with_collateral" invalidate old callbacks without changing the original operation type or recipient.
 
-Also improve:
-- Mobile responsiveness
-- Loading and success states
-- Error messages in plain language
+4. Recovery rules
 
-prompt 5
-Strengthen the payment and accounting side:
+Keep the separate recovery states:
 
-1. After a successful payment, clearly show:
-   - Status = Paid
-   - Transaction reference / hash
-   - Timestamp
+- "SettlementRecovered"
+- "RefundRecovered"
 
-2. In the School Admin dashboard:
-   - Make status filters easy (All / Pending / Paid)
-   - Show transaction reference for paid invoices
+The restrictions must remain absolute:
 
-3. CSV export must contain at least:
-   - Invoice ID
-   - Student name / ID
-   - Term
-   - Amount
-   - Status
-   - Payment timestamp
-   - Transaction hash / reference
+- "SettlementRecovered" can exit only through "restart_settlement" or "close_as_sent".
+- "RefundRecovered" can exit only through "restart_refund" or "close_as_sent".
+- A recovered refund must never pay a school treasury.
+- A recovered settlement must never refund the original payer.
+- Neither recovered state can return to "PaymentReceived".
+- Neither recovered state can accept another payment.
+- The original payer, school, treasury, gross amount, fee rate, fee amount and net amount remain unchanged.
 
-Make the CSV clean enough that a school bursar can open it and understand everything without asking questions.
+Keep these testnet settings:
 
-prompt 6
-Write a clear README.md suitable for the NEAR Hackathon judges (including AI judges).
+- Maximum two collateral-backed recoveries per invoice.
+- Maximum 1,000 USDC lifetime collateral commitment globally.
+- Ten-minute wait before each recovery.
+- Ten-minute wait before each restart.
+- "allow_retry = true" on testnet.
+- "allow_retry = false" for intended mainnet use.
 
-Structure it like this:
+A third stuck attempt after two collateral-backed recoveries can only be closed as sent or remain frozen.
 
-# School Fee Payment Tracker
+5. Accounting and safety
 
-## Problem
-Short description of the real problem schools and parents face with fee collection.
+Please recalculate every ledger transition after these changes.
 
-## Solution
-What this app does in plain language.
+In particular, verify:
 
-## How it works
-Numbered steps a judge can follow:
-1. Do X → see Y
-2. Do X → see Y
-etc.
+- Settlement recovery.
+- Refund recovery.
+- Repeated settlement recovery.
+- Repeated refund recovery.
+- Failed restart callbacks.
+- A restarted operation becoming stuck again.
+- Interleaved operations across multiple schools.
+- Platform fee withdrawals while school payments are in flight.
+- The lifetime collateral cap.
+- The absence of any surplus-reclamation method.
 
-## Tech stack
-List what was used.
+The contract must never use another school's recorded funds to finance a recovery or platform fee withdrawal.
 
-## How to run / try the demo
-Clear instructions.
+6. Required additional tests
 
-## Notes for judges
-- Built primarily with Arc Studio for rapid prototyping of the USDC payment flow.
-- No Arc Studio or Circle branding appears in the UI.
-- Designed as a practical real-world money tool (payments + tracking + export).
-- Contract logic was structured to be portable to NEAR later.
+Please add tests proving:
 
-Keep the language factual and free of marketing hype. Focus on “do X, see Y” steps.
+1. A successfully refunded invoice cannot accept another payment.
+2. A new invoice can be created for a subsequent payment.
+3. Original payment snapshots cannot be overwritten.
+4. A recovered refund cannot settle to the school.
+5. A recovered settlement cannot refund the payer.
+6. A restarted refund pays only the original payer.
+7. A restarted settlement pays only the original treasury.
+8. Old callbacks cannot interfere after close, recovery or restart.
+9. The attempt counter never decreases or repeats.
+10. Two recoveries per invoice is the maximum.
+11. The 1,000 USDC lifetime collateral limit cannot be exceeded.
+12. Collateral cannot be replenished or reclaimed.
+13. No method can withdraw unidentified surplus.
+14. All accounting invariants hold across multiple schools and repeated recovery cycles.
 
-prompt 7
-Prepare the project for export:
+Please also update every affected status table, method table, data model, accounting example and application integration requirement.
 
-1. Make sure the code is clean and well organized.
-2. Confirm again that no Arc Studio / Circle branding exists in the UI or in any generated comments that would appear to users.
-3. make sure that the build align with my contract already deployed 
-my feed back
+7. Decisions that remain unchanged
 
-I want the outline for a REAL multi-school architecture, not the cheaper demo.
+- Platform owner: "mouseng20.testnet", after signed-message ownership verification.
+- Owner cannot be a school administrator.
+- The v3 demo school must use a different administrator.
+- Default platform fee: 1%.
+- Maximum platform fee: 5%.
+- Maximum invoice: 1,000 USDC.
+- Maximum money at risk: 5,000 USDC.
+- Dedicated platform fee treasury must be a separate account.
+- Automatic settlement is built only after successful testnet integration tests.
+- v3 is non-upgradeable.
+- Existing "v2.studentfee.testnet" must remain completely untouched.
 
-The goal is to build a School Fee Registry that can serve multiple independent schools.
+The dedicated platform fee treasury account name is still pending. Do not invent one.
 
-Before writing any code, provide a detailed technical outline covering:
+Final instruction
 
-1. How schools will be registered on the contract.
-2. How each school will have its own administrator and treasury wallet.
-3. How each school will create, manage and cancel its own invoices.
-4. How payments will be routed to the correct school's treasury.
-5. How platform fees will be collected.
-6. How to prevent one school from accessing or modifying another school's data.
-7. How refunds and payment settlements will work.
-8. The required changes to the smart contract, backend, database and dashboard.
-9. Security risks and how they will be handled.
-10. Test cases required before deployment.
+Return one complete, internally consistent v3 specification incorporating all these decisions.
 
-Important:
-
-- The existing deployed contract must remain untouched.
-- Propose a new contract version for multi-school support.
-- Preserve the existing payment security and refund mechanisms where appropriate.
-- Explain the implications for the existing USDC integration.
-- Identify any changes needed to the current application architecture.
-
-Do not implement anything yet. Give me the outline, explain the trade-offs, and wait for my approval.
+Do not implement or deploy anything. I will review the complete document before giving approval.

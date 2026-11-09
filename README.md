@@ -39,9 +39,10 @@ Prerequisites: Bun, and a NEAR Testnet account that holds the testnet USDC token
 
 ```bash
 bun install
-bun run server   # API and database, port 8787
-bun run dev      # web app, port 5173 (proxies /api to the server)
+bun run dev      # starts the web app (port 5173) and the API with its database (port 8787)
 ```
+
+`bun run server` starts only the API, for example in production after `bun run build`.
 
 Other commands: `bun run build` (production build into `dist/`, served by `bun run start`), `bun run check` (lint and type check).
 

@@ -40,6 +40,5 @@ School fee invoices with public payment links. Parents pay USDC on NEAR Testnet.
 
 ```bash
 bun install
-bun run server
-bun run dev
+bun run dev   # starts Vite and the API together
 ```
