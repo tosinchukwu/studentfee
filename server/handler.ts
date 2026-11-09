@@ -285,7 +285,7 @@ async function route(request: Request, url: URL): Promise<Response> {
 
   if (pathname === '/api/admin/invoices' && method === 'GET') return listAll(request)
   if (pathname === '/api/admin/invoices' && method === 'POST') return createInvoice(request)
-  if (pathname === '/api/admin/export.csv' && method === 'GET') return exportCsv(request)
+  if ((pathname === '/api/admin/export' || pathname === '/api/admin/export.csv') && method === 'GET') return exportCsv(request)
   if (pathname === '/api/admin/health' && method === 'GET') {
     await requireAdmin(request)
     return json(await adapterForNewInvoices().health())

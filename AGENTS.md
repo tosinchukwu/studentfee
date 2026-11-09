@@ -21,7 +21,7 @@ School fee invoices with public payment links. Parents pay USDC on NEAR Testnet.
 ## Stack
 
 - Frontend: React 18, Vite, TypeScript, Tailwind (`src/`)
-- Backend: shared handler in `server/handler.ts`, run as a Vercel function (`api/[...path].ts`) and by the local Bun server. PostgreSQL via `DATABASE_URL`. No data on local disk
+- Backend: shared handler in `server/handler.ts`, run as a Vercel function (`api/`, one small file per route) and by the local Bun server. PostgreSQL via `DATABASE_URL`. No data on local disk
 - Contract adapters per version: `server/contracts/` and `src/lib/contracts.ts`. Only v2 exists
 - Wallets: NEAR Wallet Selector (`src/lib/near.tsx`)
 

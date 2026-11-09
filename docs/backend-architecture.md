@@ -1,6 +1,6 @@
 # Backend architecture
 
-- `api/[...path].ts`: the only Vercel function. Converts the request and calls the shared handler.
+- `api/`: Vercel functions, one small file per route, all re-exporting `api/_lib/adapter.ts`, which converts the request and calls the shared handler.
 - `server/handler.ts`: the whole API as `handle(Request): Promise<Response>`. No framework or runtime dependency, so a Vercel function, the local Bun server or a scheduled job can all call it.
 - `server/index.ts`: local and self-hosted server that serves `dist/` and calls the same handler.
 - `server/db.ts`, `server/migrations.ts`, `server/store.ts`: PostgreSQL connection, versioned migrations and all queries. Sessions are stored as hashes. Sign-in challenges are single use.

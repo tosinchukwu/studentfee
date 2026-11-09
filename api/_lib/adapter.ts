@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { handle } from '../server/handler.js'
+import { handle } from '../../server/handler.js'
 
-// Vercel serverless entry for every /api/* route. It turns the Node request into a standard
-// Request, runs the shared handler, and writes the Response back. Data is stored in PostgreSQL
-// (DATABASE_URL), so functions keep no state between requests.
+// Shared by every file in api/. Each file is one Vercel function route and simply re-exports this.
+// It turns the Node request into a standard Request, runs the shared handler, and writes the
+// Response back. Data lives in PostgreSQL (DATABASE_URL), so functions keep no state.
 
 const MAX_BODY_BYTES = 64 * 1024
 
@@ -24,7 +24,7 @@ async function readBody(req: IncomingMessage & { body?: unknown }): Promise<Buff
   return Buffer.concat(chunks)
 }
 
-export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
+export default async function vercelHandler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? 'localhost')
   const proto = String(req.headers['x-forwarded-proto'] ?? 'https').split(',')[0]
   const headers = new Headers()

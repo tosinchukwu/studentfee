@@ -77,7 +77,7 @@ export const api = {
   saveSchoolName: (schoolName: string) => postJson<PublicConfig>('/api/admin/settings', { schoolName }, true, 'PUT'),
 
   async downloadCsv(): Promise<void> {
-    const res = await send('/api/admin/export.csv', {}, true)
+    const res = await send('/api/admin/export', {}, true)
     const url = URL.createObjectURL(await res.blob())
     const link = document.createElement('a')
     link.href = url

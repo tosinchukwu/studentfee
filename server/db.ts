@@ -11,8 +11,18 @@ export class DatabaseConfigError extends Error {}
 
 let pool: pg.Pool | null = null
 
+/**
+ * The connection string from the server environment. Vercel's Neon integration sets DATABASE_URL,
+ * but if a custom prefix was chosen it appears as PREFIX_DATABASE_URL, so those are accepted too.
+ * Direct (unpooled) variants are skipped because serverless functions should use the pooled one.
+ */
 export function databaseUrl(): string {
-  return process.env.DATABASE_URL ?? process.env.POSTGRES_URL ?? ''
+  const direct = process.env.DATABASE_URL ?? process.env.POSTGRES_URL
+  if (direct) return direct
+  const match = Object.keys(process.env).find(
+    (name) => /(^|_)(DATABASE|POSTGRES)_URL$/.test(name) && !/UNPOOLED|NON_POOLING/.test(name) && process.env[name],
+  )
+  return match ? (process.env[match] ?? '') : ''
 }
 
 export function getPool(): pg.Pool {

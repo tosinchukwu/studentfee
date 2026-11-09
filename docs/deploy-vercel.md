@@ -1,6 +1,6 @@
 # Deploying to Vercel (frontend, API and PostgreSQL)
 
-Everything runs on Vercel: the web app (static files), the API (serverless function `api/[...path].ts`) and a PostgreSQL database. No application data is stored on any server disk.
+Everything runs on Vercel: the web app (static files), the API (serverless functions in `api/`, one small file per route) and a PostgreSQL database. No application data is stored on any server disk.
 
 ## One-time setup
 1. Push this project to your GitHub repository and import it in Vercel (Vite is detected automatically).
