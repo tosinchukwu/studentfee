@@ -1,4 +1,4 @@
-import type { HealthReport, InvoiceView, LineItem, PublicConfig } from './types'
+import type { ContractVersion, HealthReport, InvoiceView, LineItem, PublicConfig } from './types'
 
 const TOKEN_KEY = 'fees.admin.session'
 
@@ -67,7 +67,11 @@ export const api = {
 
   adminInvoices: () => getJson<{ invoices: InvoiceView[] }>('/api/admin/invoices', true),
   createInvoice: (input: NewInvoiceInput) =>
-    postJson<{ id: string; amountBase: string; dueDate: number }>('/api/admin/invoices', input, true),
+    postJson<{ id: string; amountBase: string; dueDate: number; contractId: string; contractVersion: ContractVersion }>(
+      '/api/admin/invoices',
+      input,
+      true,
+    ),
   deleteInvoice: (id: string) => postJson<{ ok: boolean }>(`/api/admin/invoices/${id}`, {}, true, 'DELETE'),
   health: () => getJson<HealthReport>('/api/admin/health', true),
   saveSchoolName: (schoolName: string) => postJson<PublicConfig>('/api/admin/settings', { schoolName }, true, 'PUT'),

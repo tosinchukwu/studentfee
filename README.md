@@ -28,34 +28,37 @@ Schools collect fees through cash, bank transfers and receipts that are matched 
 ## Tech stack
 
 - React 18, Vite, TypeScript, Tailwind CSS
-- Bun server with a SQLite database for invoice details (student, term, fee items)
-- NEAR Testnet contract `v2.studentfee.testnet` (Rust, deployed separately) for invoice amounts, status and settlement
+- Vercel serverless API (`api/`) sharing one request handler with a local Bun server
+- PostgreSQL for invoice details, sessions and settings (Neon via the Vercel Marketplace)
+- NEAR Testnet contract `v2.studentfee.testnet` (Rust, deployed separately) for invoice amounts, status and settlement, behind a contract adapter per version
 - Testnet USDC (NEP-141 token, 6 decimals)
 - NEAR Wallet Selector (MyNearWallet, Meteor Wallet, HERE Wallet)
 
 ## How to run / try the demo
 
-Prerequisites: Bun, and a NEAR Testnet account that holds the testnet USDC token.
+Prerequisites: Bun, a PostgreSQL database, and a NEAR Testnet account that holds the testnet USDC token.
 
 ```bash
 bun install
-bun run dev      # starts the web app (port 5173) and the API with its database (port 8787)
+# start PostgreSQL locally, for example:
+docker run -d --name fees-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=fees -p 5432:5432 postgres:18-alpine
+echo 'DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/fees' >> .env
+bun run dev      # web app (port 5173) and API (port 8787) together
 ```
 
-`bun run server` starts only the API, for example in production after `bun run build`.
+Tables are created automatically on first use. Other commands: `bun run db:migrate` (apply migrations by hand), `bun run build` (production build into `dist/`), `bun run start` (API and built app on one port), `bun run check` (lint and type check).
 
-Other commands: `bun run build` (production build into `dist/`, served by `bun run start`), `bun run check` (lint and type check).
+Environment variables:
 
-Environment variables (all optional; the defaults point at the deployed testnet contract):
+- `DATABASE_URL`: PostgreSQL connection string (required, server only)
+- `NEAR_RPC_URL`: NEAR Testnet RPC endpoint (optional)
+- `CONTRACT_ID`: the fee contract account (optional)
+- `USDC_TOKEN_ID`: the USDC token account (optional)
+- `ADMIN_ACCOUNT`: the school administrator account (optional)
+- `TREASURY_ACCOUNT`: the school account that receives payments (optional)
+- `SCHOOL_NAME`: default school name shown in the header (optional)
 
-- `API_PORT`: server port
-- `NEAR_RPC_URL`: NEAR Testnet RPC endpoint
-- `CONTRACT_ID`: the fee contract account
-- `USDC_TOKEN_ID`: the USDC token account
-- `ADMIN_ACCOUNT`: the school administrator account
-- `TREASURY_ACCOUNT`: the school account that receives payments
-- `DB_PATH`: SQLite file location
-- `SCHOOL_NAME`: school name shown in the header
+Deploying to Vercel: see `docs/deploy-vercel.md`. Check `/api/health` after deploying.
 
 ## Notes for judges
 

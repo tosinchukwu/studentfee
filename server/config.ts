@@ -1,6 +1,7 @@
 // arc-studio-allow-onchain-literal
 // Server settings. Every value can be overridden with an environment variable.
-// Defaults point at the deployed NEAR Testnet contract from the project's integration notes.
+// Defaults point at the deployed NEAR Testnet v2 contract from the project's integration notes.
+// The database connection string (DATABASE_URL) is read only in db.ts and is never part of this object.
 
 export const config = {
   port: Number(process.env.API_PORT ?? 8787),
@@ -11,7 +12,6 @@ export const config = {
   adminAccount: process.env.ADMIN_ACCOUNT ?? 'mouseng20.testnet',
   treasury: process.env.TREASURY_ACCOUNT ?? 'bd73e625f18d762274625333c5200aae67d0ec65d09797b27118a06c24dc6669',
   explorerUrl: 'https://testnet.nearblocks.io',
-  dbPath: process.env.DB_PATH ?? 'data/school-fees.sqlite',
   defaultSchoolName: process.env.SCHOOL_NAME ?? 'School Fee Office',
   sessionHours: 12,
 }

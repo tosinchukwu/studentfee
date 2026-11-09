@@ -6,7 +6,8 @@ import { api } from '../lib/api'
 import { formatDate, formatDateTime, shortHash, txUrl } from '../lib/format'
 import { formatAmount, toBaseUnits } from '../lib/money'
 import { ftBalanceOf } from '../lib/rpc'
-import { GAS_100_TGAS, friendlyError, useNear } from '../lib/near'
+import { clientAdapter } from '../lib/contracts'
+import { friendlyError, useNear } from '../lib/near'
 import type { InvoiceView } from '../lib/types'
 import { Button, Card, Notice, PageShell, Spinner, StatusBadge } from '../components/ui'
 
@@ -159,13 +160,7 @@ export default function PayPage({ id }: { id: string }) {
     }
     setBusy('paying')
     try {
-      payHash.current = await near.call({
-        receiverId: config.usdcId,
-        methodName: 'ft_transfer_call',
-        args: { receiver_id: config.contractId, amount: invoice.amountBase, msg: invoice.id },
-        gas: GAS_100_TGAS,
-        deposit: 1n,
-      })
+      payHash.current = await near.call(clientAdapter(invoice.contractVersion).pay(invoice, config))
       const next = await waitFor((v) => v.chainStatus !== 'Pending')
       if (!next || next.chainStatus === 'Pending') {
         setError('We did not see your payment on the invoice. Nothing was kept. Please check your wallet and try again.')
@@ -181,7 +176,7 @@ export default function PayPage({ id }: { id: string }) {
   }
 
   const finish = async () => {
-    if (!config) return
+    if (!config || !invoice) return
     if (!accountId) {
       near.connect()
       return
@@ -189,12 +184,7 @@ export default function PayPage({ id }: { id: string }) {
     setError(null)
     setBusy('settling')
     try {
-      const hash = await near.call({
-        receiverId: config.contractId,
-        methodName: 'settle_invoice',
-        args: { invoice_id: id },
-        gas: GAS_100_TGAS,
-      })
+      const hash = await near.call(clientAdapter(invoice.contractVersion).settle(invoice))
       if (hash) await api.recordTx(id, 'settlement', hash, accountId).catch(() => undefined)
       const next = await waitFor((v) => v.chainStatus === 'Paid' || v.chainStatus === 'PaymentReceived', 90_000)
       if (next?.chainStatus === 'Paid') toast.success('Payment complete')

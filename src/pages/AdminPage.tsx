@@ -5,7 +5,8 @@ import { toast } from 'sonner'
 import { ApiError, api, session } from '../lib/api'
 import { copyText } from '../lib/format'
 import { formatAmount } from '../lib/money'
-import { GAS_100_TGAS, GAS_30_TGAS, friendlyError, useNear } from '../lib/near'
+import { clientAdapter } from '../lib/contracts'
+import { friendlyError, useNear } from '../lib/near'
 import { getShareBase } from '../lib/share'
 import type { DisplayStatus, HealthReport, InvoiceView } from '../lib/types'
 import { Button, Card, Notice, PageShell, Spinner } from '../components/ui'
@@ -220,16 +221,16 @@ export default function AdminPage() {
       return
     }
 
-    const calls = {
-      publish: { methodName: 'create_invoice', args: { invoice_id: invoice.id, amount: invoice.amountBase, due_date: invoice.dueDate }, gas: GAS_30_TGAS },
-      cancel: { methodName: 'cancel_invoice', args: { invoice_id: invoice.id }, gas: GAS_30_TGAS },
-      finish: { methodName: 'settle_invoice', args: { invoice_id: invoice.id }, gas: GAS_100_TGAS },
-      refund: { methodName: 'refund_payment', args: { invoice_id: invoice.id }, gas: GAS_100_TGAS },
-    } as const
-    const call = calls[action]
     setBusyId(invoice.id)
     try {
-      const hash = await near.call({ receiverId: config.contractId, ...call })
+      const adapter = clientAdapter(invoice.contractVersion)
+      const calls = {
+        publish: adapter.publish(invoice),
+        cancel: adapter.cancel(invoice),
+        finish: adapter.settle(invoice),
+        refund: adapter.refund(invoice),
+      } as const
+      const hash = await near.call(calls[action])
       if (action === 'finish' && hash && near.accountId) await api.recordTx(invoice.id, 'settlement', hash, near.accountId).catch(() => undefined)
       toast.success('Done. The status will update in a moment.')
       await load()

@@ -18,6 +18,9 @@ export type DisplayStatus =
   | 'Paid'
   | 'Cancelled'
 
+/** Deployed contract generations. v3 is specified but not built yet. */
+export type ContractVersion = 'v2' | 'v3'
+
 export interface OnchainInvoice {
   amount: string
   attempt_id: number
@@ -36,6 +39,9 @@ export interface LineItem {
 
 export interface InvoiceView {
   id: string
+  /** Contract account that holds this invoice, and its version. */
+  contractId: string
+  contractVersion: ContractVersion
   schoolName: string
   studentName: string
   studentId: string

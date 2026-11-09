@@ -1,32 +1,31 @@
-import { config } from './config'
-import { parseLineItems, schoolName, type InvoiceRow } from './db'
-import { viewCall } from '../src/lib/rpc'
-import type { ChainStatus, DisplayStatus, InvoiceView, OnchainInvoice } from '../src/lib/types'
+import { adapterForContract } from './contracts/registry.js'
+import { parseLineItems } from './lineItems.js'
+import type { InvoiceRow } from './store.js'
+import type { ChainStatus, DisplayStatus, InvoiceView, OnchainInvoice } from '../src/lib/types.js'
 
 const TTL_MS = 3000
 const cache = new Map<string, { at: number; value: OnchainInvoice | null }>()
 
-/** Reads one invoice from the contract. Null means the contract has no such invoice. */
-export async function readChain(id: string, fresh = false): Promise<OnchainInvoice | null> {
-  const hit = cache.get(id)
+/** Reads one invoice from the contract it belongs to. Null means the contract has no such invoice. */
+export async function readChain(row: Pick<InvoiceRow, 'id' | 'contract_id'>, fresh = false): Promise<OnchainInvoice | null> {
+  const key = `${row.contract_id}:${row.id}`
+  const hit = cache.get(key)
   if (!fresh && hit && Date.now() - hit.at < TTL_MS) return hit.value
-  const value = await viewCall<OnchainInvoice | null>(config.rpcUrl, config.contractId, 'get_invoice', {
-    invoice_id: id,
-  })
-  cache.set(id, { at: Date.now(), value })
+  const value = await adapterForContract(row.contract_id).readInvoice(row.id)
+  cache.set(key, { at: Date.now(), value })
   return value
 }
 
-export function forget(id: string): void {
-  cache.delete(id)
+export function forget(row: Pick<InvoiceRow, 'id' | 'contract_id'>): void {
+  cache.delete(`${row.contract_id}:${row.id}`)
 }
 
-export async function readMany(ids: string[]): Promise<Map<string, OnchainInvoice | null>> {
+export async function readMany(rows: InvoiceRow[]): Promise<Map<string, OnchainInvoice | null>> {
   const out = new Map<string, OnchainInvoice | null>()
-  for (let i = 0; i < ids.length; i += 8) {
-    const batch = ids.slice(i, i + 8)
-    const results = await Promise.all(batch.map((id) => readChain(id)))
-    batch.forEach((id, index) => out.set(id, results[index] ?? null))
+  for (let i = 0; i < rows.length; i += 8) {
+    const batch = rows.slice(i, i + 8)
+    const results = await Promise.all(batch.map((row) => readChain(row)))
+    batch.forEach((row, index) => out.set(row.id, results[index] ?? null))
   }
   return out
 }
@@ -41,10 +40,12 @@ export function displayStatus(chain: OnchainInvoice | null, dueDate: number): Di
   return dueDate < Date.now() ? 'Overdue' : 'Pending'
 }
 
-export function toView(row: InvoiceRow, chain: OnchainInvoice | null): InvoiceView {
+export function toView(row: InvoiceRow, chain: OnchainInvoice | null, schoolName: string): InvoiceView {
   return {
     id: row.id,
-    schoolName: schoolName(),
+    contractId: row.contract_id,
+    contractVersion: row.contract_version,
+    schoolName,
     studentName: row.student_name,
     studentId: row.student_id,
     term: row.term,

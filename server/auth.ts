@@ -1,7 +1,7 @@
 import { createHash, createPublicKey, randomBytes, verify } from 'node:crypto'
-import { config } from './config'
-import { db } from './db'
-import { viewAccessKey } from '../src/lib/rpc'
+import { config } from './config.js'
+import { consumeChallenge, deleteSession, findSession, saveChallenge, saveSession } from './store.js'
+import { viewAccessKey } from '../src/lib/rpc.js'
 
 // Admin sign-in uses NEP-413 signed messages: the wallet proves it controls the admin account.
 export const SIGN_IN_MESSAGE = 'Sign in to the school fee dashboard'
@@ -39,12 +39,9 @@ export function nep413Hash(message: string, nonce: Buffer, recipient: string, ca
   return createHash('sha256').update(payload).digest()
 }
 
-export function createChallenge(): string {
+export async function createChallenge(): Promise<string | null> {
   const nonce = randomBytes(32).toString('base64')
-  const now = Date.now()
-  db.query('DELETE FROM challenges WHERE expires_at < ?').run(now)
-  db.query('INSERT INTO challenges (nonce, expires_at) VALUES (?, ?)').run(nonce, now + 5 * 60_000)
-  return nonce
+  return (await saveChallenge(nonce, Date.now() + 5 * 60_000)) ? nonce : null
 }
 
 export interface LoginInput {
@@ -56,11 +53,8 @@ export interface LoginInput {
 }
 
 export async function login(input: LoginInput): Promise<string> {
-  const challenge = db.query('SELECT expires_at FROM challenges WHERE nonce = ?').get(input.nonce) as
-    | { expires_at: number }
-    | null
-  db.query('DELETE FROM challenges WHERE nonce = ?').run(input.nonce)
-  if (!challenge || challenge.expires_at < Date.now()) throw new Error('The sign-in request expired. Please try again.')
+  const expiresAt = await consumeChallenge(input.nonce)
+  if (expiresAt === null || expiresAt < Date.now()) throw new Error('The sign-in request expired. Please try again.')
   if (input.accountId !== config.adminAccount) throw new Error('This account is not the school administrator.')
   if (!input.publicKey.startsWith('ed25519:')) throw new Error('Unsupported key type.')
 
@@ -83,23 +77,19 @@ export async function login(input: LoginInput): Promise<string> {
   }
 
   const token = randomBytes(32).toString('hex')
-  const expires = Date.now() + config.sessionHours * 3_600_000
-  db.query('DELETE FROM sessions WHERE expires_at < ?').run(Date.now())
-  db.query('INSERT INTO sessions (token, account_id, expires_at) VALUES (?, ?, ?)').run(token, input.accountId, expires)
+  await saveSession(token, input.accountId, Date.now() + config.sessionHours * 3_600_000)
   return token
 }
 
-export function sessionFrom(request: Request): string | null {
+export async function sessionFrom(request: Request): Promise<string | null> {
   const header = request.headers.get('authorization') ?? ''
   const token = header.startsWith('Bearer ') ? header.slice(7) : ''
   if (!token) return null
-  const row = db.query('SELECT account_id, expires_at FROM sessions WHERE token = ?').get(token) as
-    | { account_id: string; expires_at: number }
-    | null
+  const row = await findSession(token)
   if (!row || row.expires_at < Date.now() || row.account_id !== config.adminAccount) return null
   return token
 }
 
-export function logout(token: string): void {
-  db.query('DELETE FROM sessions WHERE token = ?').run(token)
+export async function logout(token: string): Promise<void> {
+  await deleteSession(token)
 }

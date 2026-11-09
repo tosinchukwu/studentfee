@@ -1,17 +1,4 @@
-// Minimal typings for the Bun runtime APIs the server uses.
-declare module 'bun:sqlite' {
-  interface Statement {
-    get(...params: unknown[]): unknown
-    all(...params: unknown[]): unknown[]
-    run(...params: unknown[]): void
-  }
-  export class Database {
-    constructor(path: string, options?: { create?: boolean })
-    exec(sql: string): void
-    query(sql: string): Statement
-  }
-}
-
+// Minimal typings for the Bun runtime APIs the local server uses.
 declare const Bun: {
   serve(options: {
     port: number

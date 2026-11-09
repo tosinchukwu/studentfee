@@ -1,64 +1,89 @@
-import { Database } from 'bun:sqlite'
-import { mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
-import { config } from './config'
-import type { LineItem } from '../src/lib/types'
+import pg from 'pg'
+import { MIGRATIONS } from './migrations.js'
 
-mkdirSync(dirname(config.dbPath), { recursive: true })
-export const db = new Database(config.dbPath, { create: true })
-db.exec('PRAGMA journal_mode = WAL')
+// PostgreSQL connection for Node (Vercel functions) and Bun (local server).
+// The connection string comes only from the server environment and is never sent to the browser.
 
-db.exec(`
-CREATE TABLE IF NOT EXISTS invoices (
-  id TEXT PRIMARY KEY,
-  student_name TEXT NOT NULL,
-  student_id TEXT NOT NULL DEFAULT '',
-  term TEXT NOT NULL,
-  amount_base TEXT NOT NULL,
-  due_date_ms INTEGER NOT NULL,
-  line_items TEXT NOT NULL DEFAULT '[]',
-  note TEXT NOT NULL DEFAULT '',
-  created_at INTEGER NOT NULL,
-  payment_tx TEXT,
-  settlement_tx TEXT
-);
-CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS challenges (nonce TEXT PRIMARY KEY, expires_at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, account_id TEXT NOT NULL, expires_at INTEGER NOT NULL);
-`)
+// BIGINT columns hold millisecond timestamps, which fit safely in a JavaScript number.
+pg.types.setTypeParser(20, (value) => Number(value))
 
-export interface InvoiceRow {
-  id: string
-  student_name: string
-  student_id: string
-  term: string
-  amount_base: string
-  due_date_ms: number
-  line_items: string
-  note: string
-  created_at: number
-  payment_tx: string | null
-  settlement_tx: string | null
+export class DatabaseConfigError extends Error {}
+
+let pool: pg.Pool | null = null
+
+export function databaseUrl(): string {
+  return process.env.DATABASE_URL ?? process.env.POSTGRES_URL ?? ''
 }
 
-export function parseLineItems(raw: string): LineItem[] {
+export function getPool(): pg.Pool {
+  if (pool) return pool
+  const connectionString = databaseUrl()
+  if (!connectionString) throw new DatabaseConfigError('DATABASE_URL is not set')
+  // A serverless instance handles one request at a time, so one connection is enough there.
+  const serverless = Boolean(process.env.VERCEL)
+  pool = new pg.Pool({
+    connectionString,
+    max: serverless ? 1 : 5,
+    idleTimeoutMillis: serverless ? 10_000 : 30_000,
+    connectionTimeoutMillis: 10_000,
+  })
+  pool.on('error', (error) => console.error('Database pool error:', error.message))
+  return pool
+}
+
+let migrated: Promise<unknown> | null = null
+
+/** Applies any missing migrations once per process. Safe to call on every request. */
+export async function ensureSchema(): Promise<void> {
+  migrated ??= runMigrations().catch((error: unknown) => {
+    migrated = null
+    throw error
+  })
+  await migrated
+}
+
+export async function runMigrations(): Promise<string[]> {
+  const client = await getPool().connect()
+  const applied: string[] = []
   try {
-    const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as LineItem[]) : []
-  } catch {
-    return []
+    // One migrator at a time, even if several serverless instances start together.
+    await client.query('SELECT pg_advisory_lock(727274)')
+    await client.query('CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, applied_at BIGINT NOT NULL)')
+    const done = new Set((await client.query<{ id: string }>('SELECT id FROM schema_migrations')).rows.map((row) => row.id))
+    for (const migration of MIGRATIONS) {
+      if (done.has(migration.id)) continue
+      await client.query('BEGIN')
+      try {
+        await client.query(migration.sql)
+        await client.query('INSERT INTO schema_migrations (id, applied_at) VALUES ($1, $2)', [migration.id, Date.now()])
+        await client.query('COMMIT')
+        applied.push(migration.id)
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      }
+    }
+  } finally {
+    await client.query('SELECT pg_advisory_unlock(727274)').catch(() => undefined)
+    client.release()
   }
+  return applied
 }
 
-export function getSetting(key: string): string | null {
-  const row = db.query('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | null
-  return row?.value ?? null
+export async function query<T extends pg.QueryResultRow>(text: string, params: unknown[] = []): Promise<T[]> {
+  await ensureSchema()
+  return (await getPool().query<T>(text, params)).rows
 }
 
-export function setSetting(key: string, value: string): void {
-  db.query('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value)
+export async function queryOne<T extends pg.QueryResultRow>(text: string, params: unknown[] = []): Promise<T | null> {
+  return (await query<T>(text, params))[0] ?? null
 }
 
-export function schoolName(): string {
-  return getSetting('school_name') ?? config.defaultSchoolName
+export async function pingDatabase(): Promise<boolean> {
+  try {
+    await getPool().query('SELECT 1')
+    return true
+  } catch {
+    return false
+  }
 }

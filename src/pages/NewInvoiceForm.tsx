@@ -2,7 +2,8 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { api } from '../lib/api'
 import { formatAmount, toBaseUnits } from '../lib/money'
-import { GAS_30_TGAS, friendlyError, useNear } from '../lib/near'
+import { clientAdapter } from '../lib/contracts'
+import { friendlyError, useNear } from '../lib/near'
 import { Button, Card, Notice } from '../components/ui'
 
 interface ItemDraft {
@@ -70,15 +71,10 @@ export default function NewInvoiceForm({
     }
 
     setBusy(true)
-    let created: { id: string; amountBase: string; dueDate: number } | null = null
+    let created: Awaited<ReturnType<typeof api.createInvoice>> | null = null
     try {
       created = await api.createInvoice({ studentName, studentId, term, amount, dueDate, note, lineItems: cleanItems })
-      await near.call({
-        receiverId: near.config.contractId,
-        methodName: 'create_invoice',
-        args: { invoice_id: created.id, amount: created.amountBase, due_date: created.dueDate },
-        gas: GAS_30_TGAS,
-      })
+      await near.call(clientAdapter(created.contractVersion).publish(created))
       onPublished(created.id)
     } catch (e) {
       setError(
