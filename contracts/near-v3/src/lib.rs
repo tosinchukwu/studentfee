@@ -322,7 +322,7 @@ impl Contract {
 
     #[payable]
     pub fn register_school(&mut self, name: String, description: String, treasury: AccountId) -> Promise {
-        self.ensure_free_near_reserve();
+        self.ensure_async_resources();
         let admin = env::predecessor_account_id();
         require!(admin != self.owner && admin != env::current_account_id(), "Invalid school administrator");
         require!(self.admin_index.get(&admin).is_none(), "Administrator already owns a school");
@@ -398,7 +398,7 @@ impl Contract {
 
     pub fn approve_school(&mut self, school_id: String, fee_bps: u16) -> Promise {
         self.assert_owner();
-        self.ensure_free_near_reserve();
+        self.ensure_async_resources();
         require!(fee_bps <= MAX_FEE_BPS, "Platform fee exceeds 5%");
         let school = self.schools.get(&school_id).expect("School not found");
         require!(school.status == SchoolStatus::PendingApproval, "School is not awaiting approval");
@@ -435,7 +435,7 @@ impl Contract {
 
     pub fn reactivate_school(&mut self, school_id: String) -> Promise {
         self.assert_owner();
-        self.ensure_free_near_reserve();
+        self.ensure_async_resources();
         let school = self.schools.get(&school_id).expect("School not found");
         require!(school.status == SchoolStatus::Suspended, "School is not suspended");
         ext_ft::ext(self.usdc_token.clone())
@@ -513,7 +513,7 @@ impl Contract {
     }
 
     pub fn queue_treasury_change(&mut self, school_id: String, new_treasury: AccountId) -> Promise {
-        self.ensure_free_near_reserve();
+        self.ensure_async_resources();
         let mut school = self.get_admin_school(&school_id);
         require!(school.queued_treasury.is_none(), "A treasury change is already queued");
         require!(new_treasury != school.treasury, "Treasury is unchanged");
@@ -554,7 +554,7 @@ impl Contract {
     }
 
     pub fn apply_treasury_change(&mut self, school_id: String) -> Promise {
-        self.ensure_free_near_reserve();
+        self.ensure_async_resources();
         let school = self.get_admin_school(&school_id);
         let new_treasury = school.queued_treasury.clone().expect("No treasury change queued");
         let effective = school.treasury_effective_at.expect("No effective time");
@@ -602,8 +602,7 @@ impl Contract {
     }
 
     pub fn withdraw_storage(&mut self, school_id: String, amount: U128) -> Promise {
-        self.ensure_free_near_reserve();
-        require!(env::prepaid_gas() >= MIN_CALL_GAS, "Attach more gas for storage withdrawal and callback");
+        self.ensure_async_resources();
         let mut school = self.get_admin_school(&school_id);
         require!(school.status != SchoolStatus::PendingApproval, "Storage cannot be withdrawn before school activation");
         require!(amount.0 > 0 && amount.0 <= school.storage_balance, "Insufficient prepaid storage");
@@ -810,7 +809,7 @@ impl Contract {
 
     pub fn set_platform_treasury(&mut self, account_id: AccountId) -> Promise {
         self.assert_owner();
-        self.ensure_free_near_reserve();
+        self.ensure_async_resources();
         require!(account_id != self.owner && account_id != env::current_account_id(), "Platform treasury must be a separate account");
         require!(self.admin_index.get(&account_id).is_none(), "A school administrator cannot be the platform treasury");
         require!(self.treasury_index.get(&account_id).is_none(), "A school treasury cannot be the platform treasury");
@@ -831,7 +830,7 @@ impl Contract {
 
     pub fn withdraw_fees(&mut self, amount: U128) -> Promise {
         self.assert_owner();
-        self.ensure_free_near_reserve();
+        self.ensure_async_resources();
         require!(!self.paused, "Contract is paused");
         require!(amount.0 > 0 && amount.0 <= self.fees_available, "Amount exceeds available platform fees");
         require!(self.platform_treasury_verified, "Platform treasury is not configured and verified");
@@ -931,8 +930,7 @@ impl Contract {
     // ----- Internal helpers -----
 
     fn start_invoice_transfer(&mut self, mut invoice: Invoice, operation: OperationType, recovered: bool) -> Promise {
-        self.ensure_free_near_reserve();
-        require!(env::prepaid_gas() >= MIN_CALL_GAS, "Attach more gas for transfer and callback");
+        self.ensure_async_resources();
         let now = env::block_timestamp();
         if recovered {
             require!(invoice.operation_type == Some(operation), "Recovered operation type mismatch");
@@ -1064,6 +1062,11 @@ impl Contract {
         if caller != self.owner {
             self.assert_school_admin(school_id);
         }
+    }
+
+    fn ensure_async_resources(&self) {
+        require!(env::prepaid_gas() >= MIN_CALL_GAS, "Attach at least 70 Tgas for the asynchronous call and callback");
+        self.ensure_free_near_reserve();
     }
 
     fn ensure_free_near_reserve(&self) {
