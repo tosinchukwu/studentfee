@@ -1386,6 +1386,44 @@ mod tests {
     }
 
     #[test]
+    fn reactivation_is_single_flight_and_stale_callbacks_cannot_unsuspend_a_school() {
+        let (mut contract, _, _) = funded_contract();
+        let mut school = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        school.status = SchoolStatus::Suspended;
+        contract.schools.insert(&SCHOOL_ID.to_string(), &school);
+
+        context("owner.testnet", 4, None);
+        let _promise = contract.reactivate_school(SCHOOL_ID.to_string());
+        assert!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().reactivation_pending);
+        let duplicate = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.reactivate_school(SCHOOL_ID.to_string());
+        }));
+        assert!(duplicate.is_err());
+
+        let storage_balance = StorageBalance { total: U128(1), available: U128(0) };
+        let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
+        context("registry.testnet", 5, Some(PromiseResult::Successful(result.clone())));
+        assert!(contract.on_reactivate_school_check(SCHOOL_ID.to_string()));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::Active);
+        assert!(!contract.schools.get(&SCHOOL_ID.to_string()).unwrap().reactivation_pending);
+
+        context("owner.testnet", 6, None);
+        contract.suspend_school(SCHOOL_ID.to_string());
+        context("registry.testnet", 7, Some(PromiseResult::Successful(result.clone())));
+        assert!(!contract.on_reactivate_school_check(SCHOOL_ID.to_string()));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::Suspended);
+
+        context("owner.testnet", 8, None);
+        let _second = contract.reactivate_school(SCHOOL_ID.to_string());
+        context("owner.testnet", 8 + WAIT_NS, None);
+        contract.cancel_reactivation(SCHOOL_ID.to_string());
+        assert!(!contract.schools.get(&SCHOOL_ID.to_string()).unwrap().reactivation_pending);
+        context("registry.testnet", 9 + WAIT_NS, Some(PromiseResult::Successful(result)));
+        assert!(!contract.on_reactivate_school_check(SCHOOL_ID.to_string()));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::Suspended);
+    }
+
+    #[test]
     fn treasury_accounts_cannot_register_as_school_administrators() {
         let (mut contract, _, _) = funded_contract();
         context("treasury.testnet", 4, None);
