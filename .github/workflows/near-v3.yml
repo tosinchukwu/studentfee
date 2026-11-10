@@ -29,6 +29,8 @@ jobs:
         with:
           toolchain: stable
           targets: wasm32-unknown-unknown
+      - name: Install pinned cargo-near
+        run: cargo install cargo-near --version 0.22.0 --locked
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -55,8 +57,20 @@ jobs:
           else
             echo "committed=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Compile v3 WebAssembly target with locked dependencies
-        run: cargo build --locked --manifest-path contracts/near-v3/Cargo.toml --target wasm32-unknown-unknown --release
+      - name: Build optimized WebAssembly and generate ABI
+        working-directory: contracts/near-v3
+        run: cargo near build non-reproducible-wasm --locked
+      - name: Record optimized artifact hashes
+        working-directory: contracts/near-v3
+        run: |
+          find target/near -type f \\( -name '*.wasm' -o -name '*abi.json' \\) -print
+          find target/near -type f -name '*.wasm' -exec sha256sum {} \\;
+      - name: Upload optimized WebAssembly and ABI
+        uses: actions/upload-artifact@v4
+        with:
+          name: near-v3-optimized-wasm-and-abi
+          path: contracts/near-v3/target/near/**
+          if-no-files-found: error
       - name: Run locked contract tests
         run: cargo test --locked --manifest-path contracts/near-v3/Cargo.toml
       - name: Trigger validation on the lockfile commit
