@@ -30,7 +30,11 @@ jobs:
           toolchain: stable
           targets: wasm32-unknown-unknown
       - name: Install pinned cargo-near
-        run: cargo install cargo-near --version 0.22.0 --locked
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh -o /tmp/cargo-near-installer.sh
+          echo "efbc260384a2e40c5690a6e0c5eae125eaa51347e38dfaaff07d342e704486f7  /tmp/cargo-near-installer.sh" | sha256sum -c -
+          sh /tmp/cargo-near-installer.sh
+          cargo near --version
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
