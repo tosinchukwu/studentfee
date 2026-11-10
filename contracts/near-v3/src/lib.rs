@@ -1682,7 +1682,7 @@ mod tests {
         context("owner.testnet", 6, None);
         contract.suspend_school(SCHOOL_ID.to_string());
         context("registry.testnet", 7, Some(PromiseResult::Successful(result.clone())));
-        assert!(!contract.on_reactivate_school_check(SCHOOL_ID.to_string(), account("treasury.testnet"), 2));
+        assert!(!contract.on_reactivate_school_check(SCHOOL_ID.to_string(), account("treasury.testnet"), 1));
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::Suspended);
 
         context("owner.testnet", 8, None);
