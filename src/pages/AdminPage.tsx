@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, ArrowUpRight, CheckCircle2, Clock3, Download, FileText, LogOut, Plus, Search, ShieldCheck, TriangleAlert, Wallet } from 'lucide-react'
+import { Activity, ArrowUpRight, CheckCircle2, Clock3, Download, FileText, Plus, Search, ShieldCheck, TriangleAlert, Wallet } from 'lucide-react'
 import { clsx } from 'clsx'
 import { toast } from 'sonner'
 import { ApiError, api, session } from '../lib/api'
@@ -12,6 +12,7 @@ import type { DisplayStatus, HealthReport, InvoiceView } from '../lib/types'
 import { Button, Card, Notice, PageShell, Spinner } from '../components/ui'
 import InvoiceList, { type RowAction } from './InvoiceList'
 import NewInvoiceForm from './NewInvoiceForm'
+import AdminWorkspace from '../components/AdminWorkspace'
 
 type Filter = 'All' | DisplayStatus
 
@@ -294,15 +295,8 @@ export default function AdminPage() {
   if (counts['Not published']) filters.push('Not published')
 
   return (
-    <PageShell
-      schoolName={schoolName}
-      right={
-        <Button variant="ghost" onClick={() => void signOut()}>
-          <LogOut className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Sign out</span>
-        </Button>
-      }
-    >
-      <div className="space-y-5">
+    <AdminWorkspace schoolName={schoolName} accountId={near.config?.adminAccount ?? ''} onSignOut={() => void signOut()}>
+      <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="font-display text-2xl font-semibold tracking-tight">Fee invoices</h1>
@@ -348,7 +342,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
+        <div id="analytics" className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
           <Card className="space-y-5">
             <div className="flex items-start justify-between gap-3">
               <div><p className="text-sm font-semibold text-ink">Collection overview</p><p className="mt-1 text-xs text-slate-500">Live breakdown from your invoice records</p></div>
@@ -413,7 +407,7 @@ export default function AdminPage() {
           />
         )}
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div id="invoices" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter by status">
             {filters.map((name) => (
               <button
@@ -441,9 +435,9 @@ export default function AdminPage() {
         {invoices === null || !near.config ? (
           <Spinner label="Loading invoices" />
         ) : (
-          <InvoiceList invoices={visible} config={near.config} busyId={busyId} linksReady={shareBase !== null} onAction={(a, i) => void onAction(a, i)} />
+          <div id="payments"><InvoiceList invoices={visible} config={near.config} busyId={busyId} linksReady={shareBase !== null} onAction={(a, i) => void onAction(a, i)} />
         )}
       </div>
-    </PageShell>
+    </AdminWorkspace>
   )
 }
