@@ -248,20 +248,6 @@ pub struct Accounting {
 }
 
 #[near(serializers = [json])]
-pub struct WithdrawalView {
-    pub withdrawal_id: U64,
-    pub amount: U128,
-    pub recipient: AccountId,
-    pub started_at: U64,
-    pub active: bool,
-}
-impl From<Withdrawal> for WithdrawalView {
-    fn from(w: Withdrawal) -> Self {
-        Self { withdrawal_id: U64(w.withdrawal_id), amount: U128(w.amount), recipient: w.recipient, started_at: U64(w.started_at), active: w.active }
-    }
-}
-
-#[near(serializers = [json])]
 pub struct ConfigView {
     pub owner: AccountId,
     pub usdc_token: AccountId,
@@ -545,7 +531,7 @@ impl Contract {
         self.schools.insert(&school_id, &school);
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
-            .storage_balance_of(treasury)
+            .storage_balance_of(treasury.clone())
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
                 .on_reactivate_school_check(school_id, treasury, nonce))
     }
