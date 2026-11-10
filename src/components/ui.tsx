@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { GraduationCap, Loader2, ShieldCheck } from 'lucide-react'
+import { GraduationCap, Home, Loader2, ShieldCheck } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Link } from '../lib/router'
 import { STATUS_STYLES } from '../lib/format'
@@ -93,6 +93,7 @@ export function PageShell({ schoolName, right, children }: { schoolName: string;
             </span>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
+            <Link href="/" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-ink shadow-sm transition hover:border-teal-300 hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"><Home className="h-4 w-4" aria-hidden /> Home</Link>
             <span className="hidden items-center gap-1.5 rounded-full bg-teal-50 px-3 py-1.5 text-xs font-semibold text-brand-800 sm:inline-flex"><ShieldCheck className="h-3.5 w-3.5" /> NEAR Testnet</span>
             {right}
           </div>
