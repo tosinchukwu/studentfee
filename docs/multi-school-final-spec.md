@@ -263,7 +263,7 @@ The school admin registers the treasury with USDC from their own wallet (`storag
 | Unregistered between registration and approval | `approve_school` re-verifies and does not activate |
 | Unregistered later | A settlement transfer fails, the callback confirms, the invoice returns to `PaymentReceived`, funds stay safe and refundable |
 
-`register_school` keeps the record only if the verification callback returns a registered balance. `approve_school` re-verifies and sets `Active` in its callback. There is no other route to `Active`. `queue_treasury_change`, `apply_treasury_change` and `set_platform_treasury` verify too. The registry account itself must be registered with USDC once after deployment (health check).
+`register_school` keeps the record only if the verification callback returns a registered balance; its measured registration storage cost is charged to the deposit and the full remaining deposit is refunded if verification fails. `approve_school` re-verifies and sets `Active` in its callback. There is no other route to `Active`. `queue_treasury_change`, `apply_treasury_change` and `set_platform_treasury` verify too. School reactivation and platform-treasury verification are single-flight; callbacks must match the pending request, and the owner can cancel a request after the 10-minute timeout so a late callback cannot undo a later decision. The registry account itself must be registered with USDC once after deployment (health check).
 
 ## 8. Platform fees
 - Parents pay exactly the invoice amount. The fee is deducted from the school's share: `fee = floor(A * fee_bps / 10000)`, computed once at payment acceptance and stored in the snapshot. Default 1%, cap 5%.
