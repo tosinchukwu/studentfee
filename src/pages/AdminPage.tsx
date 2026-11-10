@@ -173,14 +173,18 @@ export default function AdminPage() {
     let billed = 0n
     let collected = 0n
     let outstanding = 0n
+    let overdue = 0n
     for (const invoice of invoices ?? []) {
       const amount = BigInt(invoice.amountBase)
       if (invoice.status === 'Cancelled' || invoice.status === 'Not published') continue
       billed += amount
       if (invoice.status === 'Paid') collected += amount
-      else outstanding += amount
+      else {
+        outstanding += amount
+        if (invoice.status === 'Overdue') overdue += amount
+      }
     }
-    return { billed, collected, outstanding }
+    return { billed, collected, outstanding, overdue }
   }, [invoices])
 
   const paidRate = totals.billed > 0n ? Number((totals.collected * 10000n) / totals.billed) / 100 : 0
@@ -316,7 +320,7 @@ export default function AdminPage() {
 
         <HealthStrip health={health} />
 
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
           <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-5">
             <div className="flex items-center justify-between gap-2 text-sm text-slate-500"><span>Total billed</span><span className="rounded-xl bg-slate-100 p-2 text-slate-700"><FileText className="h-4 w-4" /></span></div>
             <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">${formatAmount(totals.billed)}</p>
@@ -331,6 +335,11 @@ export default function AdminPage() {
             <div className="flex items-center justify-between gap-2 text-sm text-amber-900"><span>Outstanding</span><span className="rounded-xl bg-white/80 p-2"><Clock3 className="h-4 w-4" /></span></div>
             <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-amber-900 sm:text-3xl">${formatAmount(totals.outstanding)}</p>
             <p className="mt-1 text-xs text-amber-900/70">Awaiting payment or settlement</p>
+          </div>
+          <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4 shadow-card sm:p-5">
+            <div className="flex items-center justify-between gap-2 text-sm text-rose-800"><span>Overdue</span><span className="rounded-xl bg-white/80 p-2"><TriangleAlert className="h-4 w-4" /></span></div>
+            <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-rose-800 sm:text-3xl">${formatAmount(totals.overdue)}</p>
+            <p className="mt-1 text-xs text-rose-800/70">{counts.Overdue ?? 0} invoices need follow-up</p>
           </div>
           <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-5">
             <div className="flex items-center justify-between gap-2 text-sm text-slate-500"><span>Invoices</span><span className="rounded-xl bg-teal-50 p-2 text-brand-700"><Activity className="h-4 w-4" /></span></div>
