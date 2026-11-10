@@ -461,6 +461,7 @@ impl Contract {
 
     pub fn propose_admin(&mut self, school_id: String, new_admin: AccountId) {
         let mut school = self.get_admin_school(&school_id);
+        require!(school.status == SchoolStatus::Active, "Only an active school can transfer administration");
         require!(new_admin != self.owner && new_admin != env::current_account_id(), "Invalid school administrator");
         require!(self.treasury_index.get(&new_admin).is_none(), "A treasury account cannot become an administrator");
         require!(self.platform_treasury.as_ref() != Some(&new_admin), "Platform treasury cannot become a school administrator");
@@ -473,6 +474,7 @@ impl Contract {
     pub fn accept_admin(&mut self, school_id: String) {
         let mut school = self.schools.get(&school_id).expect("School not found");
         let caller = env::predecessor_account_id();
+        require!(school.status == SchoolStatus::Active, "Only an active school can transfer administration");
         require!(school.queued_treasury.is_none(), "Finish the queued treasury change before transferring administration");
         require!(school.proposed_admin.as_ref() == Some(&caller), "Not the proposed administrator");
         require!(caller != self.owner && self.admin_index.get(&caller).is_none(), "Administrator is unavailable");
