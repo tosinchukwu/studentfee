@@ -1915,6 +1915,7 @@ mod tests {
         context("school.testnet", effective + 2, None);
         let _requeue = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
         context("registry.testnet", effective + 3, Some(PromiseResult::Successful(result.clone())));
+        assert!(!contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 4));
         assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 6));
         let new_effective = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().treasury_effective_at.unwrap();
         context("registry.testnet", effective + 4, Some(PromiseResult::Successful(result.clone())));
