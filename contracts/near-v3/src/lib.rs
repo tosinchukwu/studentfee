@@ -1741,21 +1741,29 @@ mod tests {
     fn treasury_change_rechecks_registration_after_delay_and_ignores_stale_callbacks() {
         let (mut contract, _, _) = funded_contract();
         context("school.testnet", 4, None);
+        let _cancelled_check = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        context("school.testnet", 5, None);
+        contract.cancel_treasury_change(SCHOOL_ID.to_string());
+        let storage_balance = StorageBalance { total: U128(1), available: U128(0) };
+        let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
+        context("registry.testnet", 6, Some(PromiseResult::Successful(result.clone())));
+        assert!(!contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().queued_treasury, None);
+
+        context("school.testnet", 7, None);
         let _failed_check = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
-        context("registry.testnet", 5, Some(PromiseResult::Failed));
+        context("registry.testnet", 8, Some(PromiseResult::Failed));
         assert!(!contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
         let after_failure = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
         assert_eq!(after_failure.queued_treasury, None);
 
-        context("school.testnet", 6, None);
+        context("school.testnet", 9, None);
         let _queue = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
-        let storage_balance = StorageBalance { total: U128(1), available: U128(0) };
-        let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
-        context("registry.testnet", 7, Some(PromiseResult::Successful(result.clone())));
+        context("registry.testnet", 10, Some(PromiseResult::Successful(result.clone())));
         assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
         let queued = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
         let effective = queued.treasury_effective_at.unwrap();
-        assert_eq!(effective, 7 + TREASURY_DELAY_NS);
+        assert_eq!(effective, 10 + TREASURY_DELAY_NS);
 
         context("school.testnet", effective - 1, None);
         let too_early = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
