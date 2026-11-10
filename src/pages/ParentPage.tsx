@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowRight, BookOpen, ExternalLink, Plus, ReceiptText, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
+import { ArrowRight, BadgeCheck, BookOpen, CircleDollarSign, Clock3, ExternalLink, Plus, ReceiptText, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 import { api } from '../lib/api'
 import { formatDate } from '../lib/format'
 import { formatAmount } from '../lib/money'
@@ -85,22 +85,44 @@ export default function ParentPage() {
     setRefreshing(true)
     setRefreshToken((value) => value + 1)
   }
-  const outstanding = invoices.filter((item) => item.status === 'Pending' || item.status === 'Overdue' || item.status === 'Processing')
+  const dueInvoices = invoices.filter((item) => item.status === 'Pending' || item.status === 'Overdue')
+  const processingInvoices = invoices.filter((item) => item.status === 'Processing')
+  const paidInvoices = invoices.filter((item) => item.status === 'Paid')
+  const openBalance = dueInvoices.reduce((total, item) => total + BigInt(item.amountBase), 0n)
+  const paidTotal = paidInvoices.reduce((total, item) => total + BigInt(item.amountBase), 0n)
   return (
     <PageShell schoolName="Parent fee hub">
       <div className="mx-auto max-w-5xl space-y-6">
         <section className="overflow-hidden rounded-[1.75rem] bg-[#101D35] px-6 py-8 text-white shadow-card sm:px-9 sm:py-10">
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-teal-200"><ShieldCheck className="h-4 w-4" /> Parent portal</div>
-          <h1 className="mt-3 max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">Your school fees, in one place.</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">Keep track of the invoice links you add on this device, review balances and return to secure payment whenever you're ready.</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-teal-200"><ShieldCheck className="h-4 w-4" /> Parent portal</div>
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-teal-100">NEAR TESTNET · USDC</span>
+          </div>
+          <h1 className="mt-4 max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">Your school fees, in one place.</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">See what is due, follow payments in progress and return to verified receipts without searching through old messages.</p>
           <div className="mt-6 flex flex-wrap gap-3 text-xs text-slate-300"><span className="rounded-full bg-white/10 px-3 py-1.5">USDC payments</span><span className="rounded-full bg-white/10 px-3 py-1.5">NEAR network</span><span className="rounded-full bg-white/10 px-3 py-1.5">Printable receipts</span></div>
         </section>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card><p className="text-sm text-slate-500">Saved invoices</p><p className="mt-2 font-display text-3xl font-semibold text-ink">{invoices.length}</p></Card>
-          <Card><p className="text-sm text-slate-500">Need attention</p><p className="mt-2 font-display text-3xl font-semibold text-amber-700">{outstanding.length}</p></Card>
-          <Card><p className="text-sm text-slate-500">Paid invoices</p><p className="mt-2 font-display text-3xl font-semibold text-emerald-700">{invoices.filter((item) => item.status === 'Paid').length}</p></Card>
-        </div>
+        <section className="grid gap-4 sm:grid-cols-3" aria-label="Fee summary">
+          <Card className="relative overflow-hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div><p className="text-sm font-medium text-slate-500">Open balance</p><p className="mt-2 font-display text-2xl font-semibold tabular-nums text-ink">${formatAmount(openBalance)}</p><p className="mt-1 text-xs text-slate-500">USDC · {dueInvoices.length} invoice${dueInvoices.length === 1 ? "" : "s"} awaiting payment</p></div>
+              <span className="rounded-2xl bg-amber-50 p-3 text-amber-700"><CircleDollarSign className="h-5 w-5" /></span>
+            </div>
+          </Card>
+          <Card>
+            <div className="flex items-center justify-between gap-3">
+              <div><p className="text-sm font-medium text-slate-500">In progress</p><p className="mt-2 font-display text-3xl font-semibold text-ink">${processingInvoices.length}</p><p className="mt-1 text-xs text-slate-500">Payment${processingInvoices.length === 1 ? "" : "s"} being confirmed</p></div>
+              <span className="rounded-2xl bg-sky-50 p-3 text-sky-700"><Clock3 className="h-5 w-5" /></span>
+            </div>
+          </Card>
+          <Card>
+            <div className="flex items-center justify-between gap-3">
+              <div><p className="text-sm font-medium text-slate-500">Paid to date</p><p className="mt-2 font-display text-2xl font-semibold tabular-nums text-emerald-700">${formatAmount(paidTotal)}</p><p className="mt-1 text-xs text-slate-500">{paidInvoices.length} confirmed payment${paidInvoices.length === 1 ? "" : "s"}</p></div>
+              <span className="rounded-2xl bg-emerald-50 p-3 text-emerald-700"><BadgeCheck className="h-5 w-5" /></span>
+            </div>
+          </Card>
+        </section>
 
         <Card className="space-y-4">
           <div className="flex items-center gap-3"><span className="rounded-xl bg-teal-50 p-2.5 text-brand-700"><Plus className="h-5 w-5" /></span><div><h2 className="font-display text-xl font-semibold text-ink">Add a school invoice</h2><p className="text-sm text-slate-500">Paste the payment link provided by your school.</p></div></div>
@@ -128,7 +150,7 @@ export default function ParentPage() {
                 </div>
                 <div className="flex items-center justify-between gap-3 sm:justify-end">
                   <p className="font-display text-xl font-semibold tabular-nums text-ink">${formatAmount(invoice.amountBase)} <span className="text-xs font-medium text-slate-500">USDC</span></p>
-                  <Button onClick={() => navigate(`/pay/${invoice.id}`)}>{invoice.status === 'Paid' ? 'View receipt' : 'View & pay'} <ArrowRight className="h-4 w-4" /></Button>
+                  <Button onClick={() => navigate(`/pay/${invoice.id}`)}>{invoice.status === 'Paid' ? 'View receipt' : invoice.status === 'Processing' ? 'Continue' : 'View & pay'} <ArrowRight className="h-4 w-4" /></Button>
                   <button type="button" onClick={() => remove(invoice.id)} aria-label={`Remove invoice for ${invoice.studentName} from this device`} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </Card>
