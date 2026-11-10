@@ -1379,6 +1379,37 @@ mod tests {
     }
 
     #[test]
+    fn school_becomes_active_only_after_owner_approval_and_treasury_reverification() {
+        let (mut contract, _, _) = funded_contract();
+        let mut school = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        school.status = SchoolStatus::PendingApproval;
+        school.treasury_verified = true;
+        contract.schools.insert(&SCHOOL_ID.to_string(), &school);
+
+        context("school.testnet", 4, None);
+        let before_approval = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.create_invoice(SCHOOL_ID.to_string(), "abcdef0123456789abcdef0123456789".to_string(), U128(GROSS), 0);
+        }));
+        assert!(before_approval.is_err());
+
+        context("owner.testnet", 5, None);
+        let _failed_check = contract.approve_school(SCHOOL_ID.to_string(), 500);
+        context("registry.testnet", 6, Some(PromiseResult::Failed));
+        assert!(!contract.on_approval_treasury_check(SCHOOL_ID.to_string(), 500));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::PendingApproval);
+
+        context("owner.testnet", 7, None);
+        let _approval = contract.approve_school(SCHOOL_ID.to_string(), 500);
+        let balance = StorageBalance { total: U128(1), available: U128(0) };
+        let result = near_sdk::serde_json::to_vec(&Some(balance)).unwrap();
+        context("registry.testnet", 8, Some(PromiseResult::Successful(result)));
+        assert!(contract.on_approval_treasury_check(SCHOOL_ID.to_string(), 500));
+        let approved = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        assert_eq!(approved.status, SchoolStatus::Active);
+        assert_eq!(approved.fee_bps, 500);
+    }
+
+    #[test]
     fn school_registration_charges_measured_storage_and_refunds_full_deposit_on_failure() {
         let owner = account("owner.testnet");
         let token = account("usdc.testnet");
