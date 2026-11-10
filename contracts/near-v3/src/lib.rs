@@ -1496,6 +1496,34 @@ mod tests {
     }
 
     #[test]
+    fn ownership_and_administrator_acceptance_recheck_role_indexes() {
+        let (mut contract, _, _) = funded_contract();
+        let candidate = account("role-candidate.testnet");
+        context("owner.testnet", 4, None);
+        contract.propose_owner(candidate.clone());
+        contract.treasury_index.insert(&candidate, &SCHOOL_ID.to_string());
+        context("role-candidate.testnet", 5, None);
+        let accept_owner = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.accept_owner();
+        }));
+        assert!(accept_owner.is_err());
+        assert_eq!(contract.owner, account("owner.testnet"));
+
+        context("school.testnet", 6, None);
+        contract.propose_admin(SCHOOL_ID.to_string(), candidate.clone());
+        contract.treasury_index.remove(&candidate);
+        contract.platform_treasury = Some(candidate.clone());
+        contract.platform_treasury_verified = true;
+        context("role-candidate.testnet", 7, None);
+        let accept_admin = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.accept_admin(SCHOOL_ID.to_string());
+        }));
+        assert!(accept_admin.is_err());
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().admin, account("school.testnet"));
+        assert_eq!(contract.admin_index.get(&candidate), None);
+    }
+
+    #[test]
     fn school_and_platform_treasuries_cannot_become_school_admins() {
         let (mut contract, _, _) = funded_contract();
         context("school.testnet", 4, None);
