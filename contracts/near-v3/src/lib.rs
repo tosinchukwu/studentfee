@@ -34,6 +34,7 @@ enum StorageKey {
     AdminIndex,
     TreasuryIndex,
     Withdrawals,
+    StorageWithdrawals,
     SchoolInvoiceIds,
 }
 
@@ -107,6 +108,15 @@ pub struct Invoice {
     pub operation_from_recovered: bool,
     pub recovery_count: u8,
     pub recovered_at: Option<u64>,
+}
+
+#[near(serializers = [json, borsh])]
+#[derive(Clone)]
+pub struct StorageWithdrawal {
+    pub withdrawal_id: u64,
+    pub school_id: String,
+    pub amount: u128,
+    pub active: bool,
 }
 
 #[near(serializers = [json, borsh])]
@@ -238,7 +248,7 @@ trait ExtSelf {
     fn on_platform_treasury_check(&mut self, account_id: AccountId) -> bool;
     fn on_transfer_complete(&mut self, invoice_id: String, attempt_id: u64, operation: OperationType) -> bool;
     fn on_fee_withdrawal_complete(&mut self, withdrawal_id: u64) -> bool;
-    fn on_storage_withdrawal_complete(&mut self, school_id: String, amount: U128) -> bool;
+    fn on_storage_withdrawal_complete(&mut self, withdrawal_id: u64) -> bool;
 }
 
 #[near(contract_state)]
@@ -253,6 +263,7 @@ pub struct Contract {
     allow_retry: bool,
     next_school_id: u64,
     next_withdrawal_id: u64,
+    next_storage_withdrawal_id: u64,
     schools: UnorderedMap<String, School>,
     invoices: UnorderedMap<String, Invoice>,
     used_invoice_ids: UnorderedSet<String>,
@@ -260,6 +271,7 @@ pub struct Contract {
     treasury_index: LookupMap<AccountId, String>,
     school_invoice_ids: LookupMap<String, Vector<String>>,
     withdrawals: UnorderedMap<u64, Withdrawal>,
+    storage_withdrawals: UnorderedMap<u64, StorageWithdrawal>,
     held: u128,                 // H
     settling_gross: u128,       // SI
     settling_fee: u128,         // SF
@@ -285,6 +297,7 @@ impl Contract {
             allow_retry: true,
             next_school_id: 0,
             next_withdrawal_id: 0,
+            next_storage_withdrawal_id: 0,
             schools: UnorderedMap::new(StorageKey::Schools),
             invoices: UnorderedMap::new(StorageKey::Invoices),
             used_invoice_ids: UnorderedSet::new(StorageKey::UsedInvoiceIds),
@@ -292,6 +305,7 @@ impl Contract {
             treasury_index: LookupMap::new(StorageKey::TreasuryIndex),
             school_invoice_ids: LookupMap::new(StorageKey::SchoolInvoiceIds),
             withdrawals: UnorderedMap::new(StorageKey::Withdrawals),
+            storage_withdrawals: UnorderedMap::new(StorageKey::StorageWithdrawals),
             held: 0,
             settling_gross: 0,
             settling_fee: 0,
@@ -578,24 +592,33 @@ impl Contract {
 
     pub fn withdraw_storage(&mut self, school_id: String, amount: U128) -> Promise {
         self.ensure_free_near_reserve();
+        require!(env::prepaid_gas() >= MIN_CALL_GAS, "Attach more gas for storage withdrawal and callback");
         let mut school = self.get_admin_school(&school_id);
         require!(amount.0 > 0 && amount.0 <= school.storage_balance, "Insufficient prepaid storage");
+        let id = self.next_storage_withdrawal_id;
+        self.next_storage_withdrawal_id = self.next_storage_withdrawal_id.checked_add(1).expect("Storage withdrawal id overflow");
         school.storage_balance -= amount.0;
         self.prepaid_storage_total = self.prepaid_storage_total.checked_sub(amount.0).expect("Storage liability underflow");
         let admin = school.admin.clone();
         self.schools.insert(&school_id, &school);
+        self.storage_withdrawals.insert(&id, &StorageWithdrawal {
+            withdrawal_id: id, school_id, amount: amount.0, active: true,
+        });
         Promise::new(admin).transfer(NearToken::from_yoctonear(amount.0))
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
-                .on_storage_withdrawal_complete(school_id, amount))
+                .on_storage_withdrawal_complete(id))
     }
 
     #[private]
-    pub fn on_storage_withdrawal_complete(&mut self, school_id: String, amount: U128) -> bool {
+    pub fn on_storage_withdrawal_complete(&mut self, withdrawal_id: u64) -> bool {
+        let Some(withdrawal) = self.storage_withdrawals.get(&withdrawal_id) else { return false; };
+        if !withdrawal.active { return false; }
+        self.storage_withdrawals.remove(&withdrawal_id);
         if matches!(env::promise_result(0), PromiseResult::Successful(_)) { return true; }
-        if let Some(mut school) = self.schools.get(&school_id) {
-            school.storage_balance = school.storage_balance.checked_add(amount.0).expect("Storage balance overflow");
-            self.prepaid_storage_total = self.prepaid_storage_total.checked_add(amount.0).expect("Storage liability overflow");
-            self.schools.insert(&school_id, &school);
+        if let Some(mut school) = self.schools.get(&withdrawal.school_id) {
+            school.storage_balance = school.storage_balance.checked_add(withdrawal.amount).expect("Storage balance overflow");
+            self.prepaid_storage_total = self.prepaid_storage_total.checked_add(withdrawal.amount).expect("Storage liability overflow");
+            self.schools.insert(&withdrawal.school_id, &school);
             return true;
         }
         false
