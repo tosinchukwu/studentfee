@@ -1325,6 +1325,31 @@ mod tests {
         assert!(contract.schools.get(&school_id).is_none());
         assert!(contract.admin_index.get(&account("new-school.testnet")).is_none());
         assert_eq!(contract.prepaid_storage_total, 0);
+
+        let mut second_builder = VMContextBuilder::new();
+        second_builder
+            .current_account_id(account("registry.testnet"))
+            .predecessor_account_id(account("second-school.testnet"))
+            .block_timestamp(4)
+            .account_balance(NearToken::from_near(10))
+            .prepaid_gas(Gas::from_tgas(300))
+            .attached_deposit(NearToken::from_yoctonear(deposit));
+        testing_env!(second_builder.build());
+        let _second_promise = contract.register_school(
+            "Second School".to_string(),
+            "Successful registration".to_string(),
+            account("second-treasury.testnet"),
+        );
+        let second_id = "00000000000000000000000000000001".to_string();
+        let storage_balance = StorageBalance { total: U128(deposit), available: U128(0) };
+        let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
+        context("registry.testnet", 5, Some(PromiseResult::Successful(result)));
+        assert!(contract.on_school_treasury_check(second_id.clone(), account("second-school.testnet")));
+        let registered = contract.schools.get(&second_id).unwrap();
+        assert!(registered.treasury_verified);
+        assert_eq!(registered.status, SchoolStatus::PendingApproval);
+        assert_eq!(contract.treasury_index.get(&account("second-treasury.testnet")), Some(second_id));
+        assert_eq!(contract.prepaid_storage_total, registered.storage_balance);
     }
 
     #[test]
