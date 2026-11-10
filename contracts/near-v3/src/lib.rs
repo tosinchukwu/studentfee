@@ -2743,4 +2743,37 @@ mod tests {
         assert_eq!(after.attempt_counter, before.attempt_counter);
         assert_eq!(contract.fees_available, before.fee_amount);
     }
+
+    #[test]
+    fn pending_role_destinations_are_reserved_across_concurrent_role_changes() {
+        // A queued school treasury cannot be claimed as the platform treasury.
+        let (mut contract, _, _) = funded_contract();
+        context("school.testnet", 4, None);
+        drop(contract.queue_treasury_change(SCHOOL_ID.to_string(), account("reserved-treasury.testnet")));
+        context("owner.testnet", 5, None);
+        let platform_conflict = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.set_platform_treasury(account("reserved-treasury.testnet"));
+        }));
+        assert!(platform_conflict.is_err());
+
+        // A proposed administrator cannot simultaneously be queued as a school treasury.
+        let (mut contract, _, _) = funded_contract();
+        context("school.testnet", 4, None);
+        contract.propose_admin(SCHOOL_ID.to_string(), account("proposed-admin.testnet"));
+        let treasury_conflict = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.queue_treasury_change(SCHOOL_ID.to_string(), account("proposed-admin.testnet"));
+        }));
+        assert!(treasury_conflict.is_err());
+
+        // A pending platform-treasury verification reserves its destination immediately.
+        let (mut contract, _, _) = funded_contract();
+        context("owner.testnet", 4, None);
+        drop(contract.set_platform_treasury(account("pending-platform.testnet")));
+        context("school.testnet", 5, None);
+        let school_conflict = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.queue_treasury_change(SCHOOL_ID.to_string(), account("pending-platform.testnet"));
+        }));
+        assert!(school_conflict.is_err());
+    }
+
 }
