@@ -63,7 +63,7 @@ jobs:
       - name: Record optimized artifact hashes
         working-directory: contracts/near-v3
         run: |
-          find target/near -type f \\( -name '*.wasm' -o -name '*abi.json' \\) -print
+          find target/near -type f \( -name '*.wasm' -o -name '*abi.json' \) -print
           find target/near -type f -name '*.wasm' -exec sha256sum {} \\;
       - name: Upload optimized WebAssembly and ABI
         uses: actions/upload-artifact@v4
