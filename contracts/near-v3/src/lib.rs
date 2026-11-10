@@ -1514,6 +1514,8 @@ mod tests {
         let balance = StorageBalance { total: U128(1), available: U128(0) };
         let result = near_sdk::serde_json::to_vec(&Some(balance)).unwrap();
         context("registry.testnet", 7 + WAIT_NS, Some(PromiseResult::Successful(result.clone())));
+        assert!(!contract.on_platform_treasury_check(account("platform-treasury.testnet"), 1));
+        assert_eq!(contract.pending_platform_treasury, Some(account("platform-treasury.testnet")));
         assert!(contract.on_platform_treasury_check(account("platform-treasury.testnet"), 3));
         assert_eq!(contract.platform_treasury, Some(account("platform-treasury.testnet")));
         assert_eq!(contract.pending_platform_treasury, None);
