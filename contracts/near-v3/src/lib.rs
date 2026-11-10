@@ -601,6 +601,15 @@ impl Contract {
         } else { false }
     }
 
+    pub fn cancel_treasury_change(&mut self, school_id: String) {
+        let mut school = self.get_admin_school(&school_id);
+        require!(school.queued_treasury.is_some(), "No treasury change is queued");
+        school.queued_treasury = None;
+        school.treasury_effective_at = None;
+        self.schools.insert(&school_id, &school);
+        env::log_str(&format!("SCHOOL_TREASURY_CHANGE_CANCELLED:{}", school_id));
+    }
+
     pub fn apply_treasury_change(&mut self, school_id: String) -> Promise {
         self.ensure_async_resources();
         let school = self.get_admin_school(&school_id);
