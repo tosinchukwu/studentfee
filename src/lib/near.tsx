@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { actionCreators } from '@near-js/transactions'
 import '@near-wallet-selector/modal-ui/styles.css'
 import { api } from './api'
+import { accountExists } from './rpc'
 import type { PublicConfig } from './types'
 
 export const GAS_100_TGAS = 100_000_000_000_000n
@@ -139,6 +140,26 @@ export function NearProvider({ children }: { children: ReactNode }) {
     const wallet = await selector.wallet().catch(() => null)
     await wallet?.signOut().catch(() => undefined)
   }, [])
+
+  // A wallet's own network setting is separate from this site's. Confirm the connected account really
+  // exists on NEAR Testnet, otherwise sign it out with a clear message (for example NEAR Mobile on Mainnet).
+  useEffect(() => {
+    if (!accountId || !config) return
+    let alive = true
+    accountExists(config.rpcUrl, accountId)
+      .then((exists) => {
+        if (!alive || exists) return
+        toast.error(
+          `${accountId} was not found on NEAR Testnet. Either the wallet is still set to Mainnet (in NEAR Mobile, set the network to Testnet), or this account has no testnet NEAR yet and must be funded first. Then connect again.`,
+          { duration: 12000 },
+        )
+        void disconnect()
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [accountId, config, disconnect])
 
   const call = useCallback<NearContextValue['call']>(async ({ receiverId, methodName, args, gas, deposit = 0n }) => {
     const selector = selectorRef.current

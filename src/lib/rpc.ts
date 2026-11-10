@@ -72,6 +72,17 @@ export function getTransaction(rpcUrl: string, hash: string, signerId: string): 
   return rpc<TxStatus>(rpcUrl, 'tx', { tx_hash: hash, sender_account_id: signerId, wait_until: 'FINAL' })
 }
 
+/** True when the account exists on the network behind this RPC endpoint (so a mainnet-only account is false on testnet). */
+export async function accountExists(rpcUrl: string, accountId: string): Promise<boolean> {
+  try {
+    await rpc(rpcUrl, 'query', { request_type: 'view_account', finality: 'final', account_id: accountId })
+    return true
+  } catch (error) {
+    if (error instanceof Error && /does not exist|UNKNOWN_ACCOUNT/i.test(error.message)) return false
+    throw error
+  }
+}
+
 export interface AccessKeyInfo {
   permission: 'FullAccess' | { FunctionCall: unknown }
 }

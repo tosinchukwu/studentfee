@@ -245,6 +245,9 @@ export default function PayPage({ id }: { id: string }) {
                       Use another wallet
                     </button>
                   )}
+                  {isAndroid && !accountId && (
+                    <p className="text-center text-xs text-slate-500">Using NEAR Mobile? It must be set to the Testnet network to approve test payments.</p>
+                  )}
                   <p className="text-center text-xs text-slate-500">
                     {accountId
                       ? `Paying from ${accountId}${balance !== null ? ` · Balance $${formatAmount(balance)}` : ''}`

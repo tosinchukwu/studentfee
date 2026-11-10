@@ -62,6 +62,9 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
               Use another wallet
             </button>
           )}
+          {isAndroid && (
+            <p className="text-center text-xs text-slate-500">Using NEAR Mobile? It must be set to the Testnet network.</p>
+          )}
         </>
       ) : wrongAccount ? (
         <Button className="w-full" variant="secondary" onClick={() => void near.disconnect()}>Use a different wallet</Button>

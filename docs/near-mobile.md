@@ -2,6 +2,17 @@
 
 Status: wired in, NOT yet verified with the installed NEAR Mobile Android app. Do not treat it as supported until the checklist below passes on a real phone.
 
+## Network question (testnet)
+The website's `network: "testnet"` does not change the wallet. It only tells the NEAR Mobile relay which network the request is for.
+- **What the app does with it** (from the app's public source, `Peersyst/near-mobile-wallet`, whose last public commit is dated 2025-04-10, so it may be older than the build in the store): the app compares its own selected network with the request's network. On a mismatch it shows "Network mismatch: This request is expecting a different network" and does not let you approve. So signing a testnet request works only when the app itself is set to Testnet.
+- **The switch in that source:** a MAINNET/TESTNET chip in the app header, and Settings, General, "Select your network", both controlled by `enableChangeNetwork` (true in the production config). Switching keeps separate wallets per network. If your store build has neither, it has probably been removed since, and the official app cannot be used for testnet.
+- **The relay:** accepts `network: "testnet"` (verified, HTTP 201).
+- **Deep link:** the app registers the `near-mobile-wallet` scheme. For transaction requests it has no code that reopens the website after approval, so you switch back manually and the site picks up the result by polling. Only the NEAR Mobile in-app browser avoids that.
+- **Account check added to our site:** after any wallet connects, the site asks the testnet RPC whether the account exists there and signs it out with a message if not. (Mainnet-only or unfunded accounts fail it. Also note the treasury account `bd73...6669` does not exist on testnet yet: it can receive USDC, but needs a little testnet NEAR before it can spend or move it.)
+
+## Recommended mobile wallet for testnet
+Meteor Wallet: its listing in HOT Connect's wallet manifest marks testnet and mainnet both supported, with signMessage, on Android, iOS and web, and it is already in our wallet list. MyNearWallet's testnet web wallet (testnet.mynearwallet.com) also works in a phone browser. Neither has been tested on a phone by us.
+
 ## What was checked from source and the network
 | Check | Result |
 |---|---|
