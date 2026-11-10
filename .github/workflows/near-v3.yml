@@ -31,6 +31,8 @@ jobs:
         with:
           toolchain: stable
           targets: wasm32-unknown-unknown
+      - name: Install NEAR protocol-compatible Rust 1.86.0
+        run: rustup toolchain install 1.86.0 --profile minimal --target wasm32-unknown-unknown
       - name: Install pinned cargo-near
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.22.0/cargo-near-installer.sh -o /tmp/cargo-near-installer.sh
@@ -65,7 +67,7 @@ jobs:
           fi
       - name: Build optimized WebAssembly and generate ABI
         working-directory: contracts/near-v3
-        run: cargo near build non-reproducible-wasm --locked
+        run: cargo +1.86.0 near build non-reproducible-wasm --locked
       - name: Record optimized artifact hashes
         working-directory: contracts/near-v3
         run: |
