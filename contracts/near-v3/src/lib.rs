@@ -1508,8 +1508,12 @@ mod tests {
         let registered = contract.schools.get(&second_id).unwrap();
         assert!(registered.treasury_verified);
         assert_eq!(registered.status, SchoolStatus::PendingApproval);
-        assert_eq!(contract.treasury_index.get(&account("second-treasury.testnet")), Some(second_id));
+        assert_eq!(contract.treasury_index.get(&account("second-treasury.testnet")), Some(second_id.clone()));
         assert_eq!(contract.prepaid_storage_total, registered.storage_balance);
+        let schools = contract.get_schools(0, 100);
+        assert_eq!(schools.len(), 1);
+        assert_eq!(schools[0].school_id, second_id);
+        assert!(contract.get_schools(u64::MAX, 100).is_empty());
     }
 
     #[test]
