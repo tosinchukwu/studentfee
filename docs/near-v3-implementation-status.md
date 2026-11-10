@@ -11,8 +11,9 @@ The v3 Rust package lives at `contracts/near-v3`. It is a separate contract from
 - New NEAR SDK 5.5.0 contract package with independent storage namespaces.
 - Platform owner and USDC token are constructor parameters; the platform fee treasury starts unset.
 - One school per administrator, separate/unique school treasury indexing, treasury registration checks, owner approval, suspension and reactivation.
-- Two-step school administrator transfer and 24-hour delayed treasury change with a second registration check at apply time.
-- Prepaid school storage deposits and per-invoice measured storage charges.
+- Two-step school administrator transfer and 24-hour delayed treasury change with a second registration check at apply time; one pending change per school and stale callback guards.
+- Explicit role separation: platform owner, school admins, school treasuries and platform-fee treasury cannot overlap; role changes re-check the indexes.
+- Prepaid school storage deposits, aggregate prepaid-liability tracking, per-invoice measured storage charges, and a free-NEAR reserve check that subtracts locked storage and prepaid liabilities.
 - Globally unique 32-character lowercase-hex invoice IDs; IDs remain reserved after cancellation, payment or refund.
 - Exact-amount USDC payment acceptance for active schools only, with payer/treasury/fee snapshots.
 - 1,000 USDC invoice cap, 5,000 USDC at-risk cap, 1% default fee and 5% maximum fee.
@@ -27,8 +28,8 @@ The v3 Rust package lives at `contracts/near-v3`. It is a separate contract from
 The current code is an implementation draft, not a deployment-ready release. Before a testnet deployment:
 
 1. Complete the full acceptance suite in `docs/multi-school-final-spec.md`, including randomized accounting invariants, repeated recovery, registration races, two simultaneous payments, every permissions matrix, and all callback replay cases.
-2. Add and verify the NEAR free-balance reserve check and measure worst-case transfer/callback gas. The current gas constants are provisional, not measured.
-3. Finish storage accounting and failure-path review, including registration refund and storage-withdrawal callbacks.
+2. Measure worst-case transfer/callback gas on testnet and tune the provisional 0.1 NEAR free-balance floor and gas constants. The reserve guard is implemented, but the reserve amount is not yet empirically validated.
+3. Complete the storage accounting review, especially charging registration-record storage, and add failure/replay tests for registration refunds and storage-withdrawal callbacks.
 4. Generate and review the final ABI and optimized WASM; record the artifact hash.
 5. Verify the platform owner's full-access identity through the app's signed-message flow. Do not infer ownership from an account name.
 6. Create and confirm a dedicated platform-fee treasury account, register it with USDC, and verify its account ID. It is intentionally not guessed or configured in code.
