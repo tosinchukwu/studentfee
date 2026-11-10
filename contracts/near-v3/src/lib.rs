@@ -84,8 +84,13 @@ pub struct School {
     pub queued_treasury: Option<AccountId>,
     pub treasury_effective_at: Option<u64>,
     pub proposed_admin: Option<AccountId>,
+    pub approval_pending: bool,
+    pub approval_started_at: Option<u64>,
+    pub approval_nonce: u64,
+    pub treasury_change_nonce: u64,
     pub reactivation_pending: bool,
     pub reactivation_started_at: Option<u64>,
+    pub reactivation_nonce: u64,
 }
 
 #[near(serializers = [json, borsh])]
@@ -163,6 +168,7 @@ pub struct SchoolView {
     pub queued_treasury: Option<AccountId>,
     pub treasury_effective_at: Option<U64>,
     pub proposed_admin: Option<AccountId>,
+    pub approval_pending: bool,
     pub reactivation_pending: bool,
     pub reactivation_started_at: Option<U64>,
 }
@@ -175,7 +181,8 @@ impl From<School> for SchoolView {
             treasury_verified: s.treasury_verified, fee_bps: s.fee_bps,
             storage_balance: U128(s.storage_balance), created_at: U64(s.created_at),
             queued_treasury: s.queued_treasury, treasury_effective_at: s.treasury_effective_at.map(U64),
-            proposed_admin: s.proposed_admin, reactivation_pending: s.reactivation_pending,
+            proposed_admin: s.proposed_admin, approval_pending: s.approval_pending,
+            reactivation_pending: s.reactivation_pending,
             reactivation_started_at: s.reactivation_started_at.map(U64),
         }
     }
@@ -298,6 +305,7 @@ pub struct Contract {
     platform_treasury_verified: bool,
     pending_platform_treasury: Option<AccountId>,
     pending_platform_treasury_started_at: Option<u64>,
+    pending_platform_treasury_nonce: u64,
     paused: bool,
     allow_retry: bool,
     next_school_id: u64,
@@ -336,6 +344,7 @@ impl Contract {
             platform_treasury_verified: false,
             pending_platform_treasury: None,
             pending_platform_treasury_started_at: None,
+            pending_platform_treasury_nonce: 0,
             paused: false,
             allow_retry: true,
             next_school_id: 0,
@@ -394,8 +403,13 @@ impl Contract {
             queued_treasury: None,
             treasury_effective_at: None,
             proposed_admin: None,
+            approval_pending: false,
+            approval_started_at: None,
+            approval_nonce: 0,
+            treasury_change_nonce: 0,
             reactivation_pending: false,
             reactivation_started_at: None,
+            reactivation_nonce: 0,
         };
         let before = env::storage_usage();
         self.schools.insert(&school_id, &school);
