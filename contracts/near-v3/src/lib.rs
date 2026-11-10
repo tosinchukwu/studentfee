@@ -1306,8 +1306,13 @@ mod tests {
             queued_treasury: None,
             treasury_effective_at: None,
             proposed_admin: None,
+            approval_pending: false,
+            approval_started_at: None,
+            approval_nonce: 0,
+            treasury_change_nonce: 0,
             reactivation_pending: false,
             reactivation_started_at: None,
+            reactivation_nonce: 0,
         };
         contract.schools.insert(&SCHOOL_ID.to_string(), &school);
         contract.admin_index.insert(&admin, &SCHOOL_ID.to_string());
@@ -1375,8 +1380,13 @@ mod tests {
             queued_treasury: None,
             treasury_effective_at: None,
             proposed_admin: None,
+            approval_pending: false,
+            approval_started_at: None,
+            approval_nonce: 0,
+            treasury_change_nonce: 0,
             reactivation_pending: false,
             reactivation_started_at: None,
+            reactivation_nonce: 0,
         };
         contract.schools.insert(&SECOND_SCHOOL.to_string(), &second_school);
         contract.admin_index.insert(&second_admin, &SECOND_SCHOOL.to_string());
@@ -2563,8 +2573,13 @@ mod tests {
             queued_treasury: None,
             treasury_effective_at: None,
             proposed_admin: None,
+            approval_pending: false,
+            approval_started_at: None,
+            approval_nonce: 0,
+            treasury_change_nonce: 0,
             reactivation_pending: false,
             reactivation_started_at: None,
+            reactivation_nonce: 0,
         };
         contract.schools.insert(&other_school.school_id, &other_school);
         contract.admin_index.insert(&other_admin, &other_school.school_id);
