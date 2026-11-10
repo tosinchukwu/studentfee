@@ -1350,6 +1350,35 @@ mod tests {
     }
 
     #[test]
+    fn platform_treasury_verification_is_single_flight_and_stale_safe() {
+        let (mut contract, _, _) = funded_contract();
+        context("owner.testnet", 4, None);
+        let _first = contract.set_platform_treasury(account("platform-treasury.testnet"));
+        assert_eq!(contract.pending_platform_treasury, Some(account("platform-treasury.testnet")));
+        let second = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.set_platform_treasury(account("other-platform-treasury.testnet"));
+        }));
+        assert!(second.is_err());
+
+        context("owner.testnet", 4 + WAIT_NS, None);
+        contract.cancel_platform_treasury_verification();
+        context("registry.testnet", 5 + WAIT_NS, Some(PromiseResult::Successful(vec![])));
+        assert!(!contract.on_platform_treasury_check(account("platform-treasury.testnet")));
+        assert_eq!(contract.platform_treasury, None);
+
+        context("owner.testnet", 6 + WAIT_NS, None);
+        let _second_attempt = contract.set_platform_treasury(account("platform-treasury.testnet"));
+        let balance = StorageBalance { total: U128(1), available: U128(0) };
+        let result = near_sdk::serde_json::to_vec(&Some(balance)).unwrap();
+        context("registry.testnet", 7 + WAIT_NS, Some(PromiseResult::Successful(result.clone())));
+        assert!(contract.on_platform_treasury_check(account("platform-treasury.testnet")));
+        assert_eq!(contract.platform_treasury, Some(account("platform-treasury.testnet")));
+        assert_eq!(contract.pending_platform_treasury, None);
+        assert!(!contract.on_platform_treasury_check(account("platform-treasury.testnet")));
+        assert_eq!(contract.platform_treasury, Some(account("platform-treasury.testnet")));
+    }
+
+    #[test]
     fn school_registration_charges_measured_storage_and_refunds_full_deposit_on_failure() {
         let owner = account("owner.testnet");
         let token = account("usdc.testnet");
