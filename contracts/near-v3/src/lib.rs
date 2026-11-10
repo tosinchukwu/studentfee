@@ -1173,6 +1173,103 @@ mod tests {
         (contract, owner, admin)
     }
 
+    fn assert_ledger_invariants(contract: &Contract) {
+        let mut held = 0u128;
+        let mut settling = 0u128;
+        let mut settling_fee = 0u128;
+        let mut refunding = 0u128;
+        for (_, invoice) in contract.invoices.iter() {
+            match invoice.status {
+                InvoiceStatus::PaymentReceived | InvoiceStatus::SettlementRecovered | InvoiceStatus::RefundRecovered => {
+                    held = held.checked_add(invoice.amount).unwrap();
+                }
+                InvoiceStatus::Settling => {
+                    settling = settling.checked_add(invoice.amount).unwrap();
+                    settling_fee = settling_fee.checked_add(invoice.fee_amount).unwrap();
+                }
+                InvoiceStatus::Refunding => {
+                    refunding = refunding.checked_add(invoice.amount).unwrap();
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(contract.held, held);
+        assert_eq!(contract.settling_gross, settling);
+        assert_eq!(contract.settling_fee, settling_fee);
+        assert_eq!(contract.refunding_gross, refunding);
+        assert!(held + settling + refunding <= MAX_AT_RISK);
+        assert!(contract.lifetime_collateral <= MAX_LIFETIME_COLLATERAL);
+        let min_liability = held + settling_fee + contract.fees_available;
+        let max_liability = held + settling + refunding + contract.fees_available + contract.fees_in_flight;
+        assert!(min_liability <= max_liability);
+    }
+
+    #[test]
+    fn two_school_settlement_refund_and_fee_withdrawal_preserve_all_ledger_buckets() {
+        let (mut contract, _, _) = funded_contract();
+        const SECOND_SCHOOL: &str = "00000000000000000000000000000002";
+        const SECOND_INVOICE: &str = "fedcba9876543210fedcba9876543210";
+        let second_admin = account("other-school.testnet");
+        let second_school = School {
+            school_id: SECOND_SCHOOL.to_string(),
+            name: "Other School".to_string(),
+            description: "Accounting fixture".to_string(),
+            admin: second_admin.clone(),
+            treasury: account("other-treasury.testnet"),
+            status: SchoolStatus::Active,
+            treasury_verified: true,
+            fee_bps: DEFAULT_FEE_BPS,
+            storage_balance: 1_000_000_000_000_000_000_000_000,
+            registration_storage_cost: 0,
+            created_at: 1,
+            queued_treasury: None,
+            treasury_effective_at: None,
+            proposed_admin: None,
+        };
+        contract.schools.insert(&SECOND_SCHOOL.to_string(), &second_school);
+        contract.admin_index.insert(&second_admin, &SECOND_SCHOOL.to_string());
+        contract.treasury_index.insert(&second_school.treasury, &SECOND_SCHOOL.to_string());
+        contract.prepaid_storage_total += second_school.storage_balance;
+
+        context("other-school.testnet", 4, None);
+        contract.create_invoice(SECOND_SCHOOL.to_string(), SECOND_INVOICE.to_string(), U128(GROSS), 0);
+        context("usdc.testnet", 5, None);
+        let accepted = contract.ft_on_transfer(account("parent-two.testnet"), U128(GROSS), SECOND_INVOICE.to_string());
+        assert!(matches!(accepted, PromiseOrValue::Value(value) if value.0 == 0));
+        assert_ledger_invariants(&contract);
+
+        context("anyone.testnet", 6, None);
+        let _settle = contract.settle_invoice(INVOICE_ID.to_string());
+        assert_ledger_invariants(&contract);
+        context("other-school.testnet", 7, None);
+        let _refund = contract.refund_payment(SECOND_INVOICE.to_string());
+        assert_ledger_invariants(&contract);
+
+        context("registry.testnet", 8, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+        assert_ledger_invariants(&contract);
+        assert_eq!(contract.fees_available, FEE);
+
+        contract.platform_treasury = Some(account("platform-treasury.testnet"));
+        contract.platform_treasury_verified = true;
+        context("owner.testnet", 9, None);
+        let _withdrawal = contract.withdraw_fees(U128(FEE));
+        assert_ledger_invariants(&contract);
+        assert_eq!(contract.fees_in_flight, FEE);
+        context("registry.testnet", 10, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_fee_withdrawal_complete(0));
+        assert_ledger_invariants(&contract);
+
+        context("registry.testnet", 11, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(SECOND_INVOICE.to_string(), 1, OperationType::Refund));
+        assert_ledger_invariants(&contract);
+        assert_eq!(contract.held, 0);
+        assert_eq!(contract.settling_gross, 0);
+        assert_eq!(contract.refunding_gross, 0);
+        assert_eq!(contract.fees_available, 0);
+        assert_eq!(contract.fees_in_flight, 0);
+    }
+
     #[test]
     fn owner_cannot_become_a_school_or_platform_treasury() {
         let (mut contract, _, _) = funded_contract();
