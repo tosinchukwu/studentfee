@@ -362,12 +362,12 @@ impl Contract {
         self.ensure_async_resources();
         let admin = env::predecessor_account_id();
         require!(admin != self.owner && admin != env::current_account_id() && admin != self.usdc_token, "Invalid school administrator");
-        require!(self.admin_index.get(&admin).is_none(), "Administrator already owns a school");
-        require!(self.treasury_index.get(&admin).is_none(), "A school treasury cannot become an administrator");
+        require!(self.admin_index.get(&admin).is_none() && !self.has_proposed_admin(&admin), "Administrator already owns or is proposed for a school");
+        require!(self.treasury_index.get(&admin).is_none() && !self.has_queued_treasury(&admin, None) && self.pending_platform_treasury.as_ref() != Some(&admin), "A reserved treasury cannot become an administrator");
         require!(self.platform_treasury.as_ref() != Some(&admin), "Platform treasury cannot become a school administrator");
         require!(treasury != admin && treasury != self.owner && treasury != env::current_account_id() && treasury != self.usdc_token, "Treasury must be a separate account");
-        require!(self.treasury_index.get(&treasury).is_none(), "Treasury is already assigned to a school");
-        require!(self.admin_index.get(&treasury).is_none(), "A school administrator cannot be a treasury");
+        require!(self.treasury_index.get(&treasury).is_none() && !self.has_queued_treasury(&treasury, None) && self.pending_platform_treasury.as_ref() != Some(&treasury), "Treasury is already reserved");
+        require!(self.admin_index.get(&treasury).is_none() && !self.has_proposed_admin(&treasury), "A school administrator cannot be a treasury");
         require!(self.platform_treasury.as_ref() != Some(&treasury), "Platform treasury cannot be a school treasury");
         require!(!name.trim().is_empty() && name.len() <= MAX_NAME, "Invalid school name");
         require!(description.len() <= MAX_DESCRIPTION, "Description is too long");
@@ -434,7 +434,10 @@ impl Contract {
         if let Some(mut school) = self.schools.get(&school_id) {
             let treasury_available = self.treasury_index.get(&school.treasury).is_none()
                 && self.platform_treasury.as_ref() != Some(&school.treasury)
-                && self.admin_index.get(&school.treasury).is_none();
+                && self.pending_platform_treasury.as_ref() != Some(&school.treasury)
+                && !self.has_queued_treasury(&school.treasury, Some(&school_id))
+                && self.admin_index.get(&school.treasury).is_none()
+                && !self.has_proposed_admin(&school.treasury);
             if !registered || !treasury_available || school.admin != admin {
                 self.schools.remove(&school_id);
                 self.admin_index.remove(&admin);
@@ -599,10 +602,10 @@ impl Contract {
         let mut school = self.get_admin_school(&school_id);
         require!(school.status == SchoolStatus::Active, "Only an active school can transfer administration");
         require!(new_admin != self.owner && new_admin != env::current_account_id() && new_admin != self.usdc_token, "Invalid school administrator");
-        require!(self.treasury_index.get(&new_admin).is_none(), "A treasury account cannot become an administrator");
+        require!(self.treasury_index.get(&new_admin).is_none() && !self.has_queued_treasury(&new_admin, None) && self.pending_platform_treasury.as_ref() != Some(&new_admin), "A reserved treasury cannot become an administrator");
         require!(self.platform_treasury.as_ref() != Some(&new_admin), "Platform treasury cannot become a school administrator");
         require!(new_admin != school.admin, "Already the school administrator");
-        require!(self.admin_index.get(&new_admin).is_none(), "Account already administers a school");
+        require!(self.admin_index.get(&new_admin).is_none() && !self.has_proposed_admin(&new_admin), "Account already administers or is proposed for a school");
         school.proposed_admin = Some(new_admin);
         self.schools.insert(&school_id, &school);
     }
@@ -629,8 +632,9 @@ impl Contract {
         require!(school.queued_treasury.is_none(), "A treasury change is already queued");
         require!(new_treasury != school.treasury, "Treasury is unchanged");
         require!(new_treasury != school.admin && new_treasury != self.owner && new_treasury != env::current_account_id() && new_treasury != self.usdc_token, "Treasury must be a separate account");
-        require!(self.admin_index.get(&new_treasury).is_none(), "A school administrator cannot be a treasury");
-        require!(self.treasury_index.get(&new_treasury).map(|id| id == school_id).unwrap_or(true), "Treasury is already assigned to another school");
+        require!(self.admin_index.get(&new_treasury).is_none() && !self.has_proposed_admin(&new_treasury), "A reserved administrator cannot be a treasury");
+        require!(self.treasury_index.get(&new_treasury).is_none(), "Treasury is already assigned to a school");
+        require!(self.pending_platform_treasury.as_ref() != Some(&new_treasury) && !self.has_queued_treasury(&new_treasury, None), "Treasury is already reserved");
         require!(self.platform_treasury.as_ref() != Some(&new_treasury), "Platform treasury cannot be a school treasury");
         school.queued_treasury = Some(new_treasury.clone());
         school.treasury_effective_at = None;
@@ -703,8 +707,11 @@ impl Contract {
                 || school.treasury_effective_at.map(|time| env::block_timestamp() >= time) != Some(true)
                 || self.treasury_index.get(&new_treasury).is_some()
                 || self.platform_treasury.as_ref() == Some(&new_treasury)
+                || self.pending_platform_treasury.as_ref() == Some(&new_treasury)
+                || self.has_queued_treasury(&new_treasury, Some(&school_id))
                 || new_treasury == self.usdc_token
-                || self.admin_index.get(&new_treasury).is_some() { return false; }
+                || self.admin_index.get(&new_treasury).is_some()
+                || self.has_proposed_admin(&new_treasury) { return false; }
             self.treasury_index.remove(&school.treasury);
             self.treasury_index.insert(&new_treasury, &school_id);
             school.treasury = new_treasury;
@@ -949,8 +956,8 @@ impl Contract {
         self.ensure_async_resources();
         require!(self.pending_platform_treasury.is_none(), "A platform treasury verification is already pending");
         require!(account_id != self.owner && account_id != env::current_account_id() && account_id != self.usdc_token, "Platform treasury must be a separate account");
-        require!(self.admin_index.get(&account_id).is_none(), "A school administrator cannot be the platform treasury");
-        require!(self.treasury_index.get(&account_id).is_none(), "A school treasury cannot be the platform treasury");
+        require!(self.admin_index.get(&account_id).is_none() && !self.has_proposed_admin(&account_id), "A reserved administrator cannot be the platform treasury");
+        require!(self.treasury_index.get(&account_id).is_none() && !self.has_queued_treasury(&account_id, None), "A reserved school treasury cannot be the platform treasury");
         self.pending_platform_treasury = Some(account_id.clone());
         self.pending_platform_treasury_started_at = Some(env::block_timestamp());
         self.pending_platform_treasury_nonce = self.pending_platform_treasury_nonce.checked_add(1).expect("Platform treasury nonce overflow");
@@ -968,7 +975,9 @@ impl Contract {
         let registered = Self::storage_balance_result();
         let available = registered && account_id != self.owner && account_id != self.usdc_token
             && self.admin_index.get(&account_id).is_none()
-            && self.treasury_index.get(&account_id).is_none();
+            && !self.has_proposed_admin(&account_id)
+            && self.treasury_index.get(&account_id).is_none()
+            && !self.has_queued_treasury(&account_id, None);
         self.pending_platform_treasury = None;
         self.pending_platform_treasury_started_at = None;
         if !available { return false; }
@@ -1213,6 +1222,17 @@ impl Contract {
 
     fn valid_invoice_id(id: &str) -> bool {
         id.len() == 32 && id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    }
+
+    // Reserve destinations as soon as a role change is proposed or queued.
+    fn has_proposed_admin(&self, account: &AccountId) -> bool {
+        self.schools.iter().any(|(_, school)| school.proposed_admin.as_ref() == Some(account))
+    }
+
+    fn has_queued_treasury(&self, account: &AccountId, except_school: Option<&str>) -> bool {
+        self.schools.iter().any(|(id, school)| {
+            except_school != Some(id.as_str()) && school.queued_treasury.as_ref() == Some(account)
+        })
     }
 
     fn get_admin_school(&self, school_id: &str) -> School {
