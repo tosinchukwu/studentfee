@@ -2093,6 +2093,46 @@ mod tests {
     }
 
     #[test]
+    fn lifetime_collateral_cap_allows_exact_limit_but_never_exceeds_it() {
+        let (mut contract, _, _) = funded_contract();
+        let mut invoice = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        invoice.amount = 1;
+        invoice.fee_amount = 0;
+        invoice.net_amount = 1;
+        invoice.status = InvoiceStatus::Settling;
+        invoice.attempt_counter = 1;
+        invoice.active_attempt_id = Some(1);
+        invoice.operation_type = Some(OperationType::Settle);
+        invoice.operation_recipient = Some(account("treasury.testnet"));
+        invoice.operation_amount = 1;
+        invoice.operation_started_at = Some(1);
+        invoice.operation_from_recovered = false;
+        contract.invoices.insert(&INVOICE_ID.to_string(), &invoice);
+        contract.held = 0;
+        contract.settling_gross = 1;
+        contract.settling_fee = 0;
+        contract.lifetime_collateral = MAX_LIFETIME_COLLATERAL - 1;
+        contract.fees_available = 2;
+
+        context("owner.testnet", 1 + WAIT_NS, None);
+        contract.retry_with_collateral(INVOICE_ID.to_string(), "exact cap".to_string());
+        assert_eq!(contract.lifetime_collateral, MAX_LIFETIME_COLLATERAL);
+        assert_eq!(contract.fees_available, 1);
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::SettlementRecovered);
+
+        context("school.testnet", 1 + 2 * WAIT_NS, None);
+        let _restart = contract.restart_settlement(INVOICE_ID.to_string());
+        context("owner.testnet", 1 + 3 * WAIT_NS, None);
+        let over_cap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.retry_with_collateral(INVOICE_ID.to_string(), "over cap".to_string());
+        }));
+        assert!(over_cap.is_err());
+        assert_eq!(contract.lifetime_collateral, MAX_LIFETIME_COLLATERAL);
+        assert_eq!(contract.fees_available, 1);
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Settling);
+    }
+
+    #[test]
     fn an_invoice_can_use_at_most_two_collateral_recoveries() {
         let (mut contract, _, _) = funded_contract();
         contract.fees_available = 2 * NET;
