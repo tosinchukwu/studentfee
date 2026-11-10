@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Activity, ArrowLeftRight, BarChart3, CreditCard, GraduationCap, LayoutDashboard, LogOut, ReceiptText, ShieldCheck, Users } from 'lucide-react'
+import { Activity, ArrowLeftRight, BarChart3, CreditCard, GraduationCap, Home, LayoutDashboard, LogOut, ReceiptText, ShieldCheck, Users } from 'lucide-react'
 
 const items = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
