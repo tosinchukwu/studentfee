@@ -1691,9 +1691,23 @@ mod tests {
         context("owner.testnet", 8 + WAIT_NS, None);
         contract.cancel_reactivation(SCHOOL_ID.to_string());
         assert!(!contract.schools.get(&SCHOOL_ID.to_string()).unwrap().reactivation_pending);
-        context("registry.testnet", 9 + WAIT_NS, Some(PromiseResult::Successful(result)));
-        assert!(!contract.on_reactivate_school_check(SCHOOL_ID.to_string()));
+        context("registry.testnet", 9 + WAIT_NS, Some(PromiseResult::Successful(result.clone())));
+        assert!(!contract.on_reactivate_school_check(SCHOOL_ID.to_string(), account("treasury.testnet"), 2));
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::Suspended);
+
+        let mut school = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        contract.treasury_index.remove(&school.treasury);
+        school.treasury = account("new-treasury.testnet");
+        school.treasury_verified = false;
+        contract.treasury_index.insert(&school.treasury, &SCHOOL_ID.to_string());
+        contract.schools.insert(&SCHOOL_ID.to_string(), &school);
+        context("owner.testnet", 10 + WAIT_NS, None);
+        let _third = contract.reactivate_school(SCHOOL_ID.to_string());
+        context("registry.testnet", 11 + WAIT_NS, Some(PromiseResult::Successful(result.clone())));
+        assert!(!contract.on_reactivate_school_check(SCHOOL_ID.to_string(), account("treasury.testnet"), 2));
+        assert!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().reactivation_pending);
+        assert!(contract.on_reactivate_school_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 4));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::Active);
     }
 
     #[test]
