@@ -2592,6 +2592,7 @@ mod tests {
         context("owner.testnet", 4 + WAIT_NS, None);
         recovered.retry_with_collateral(INVOICE_ID.to_string(), "refund collateral".to_string());
         assert_eq!(recovered.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::RefundRecovered);
+        context("owner.testnet", 4 + 2 * WAIT_NS, None);
         recovered.close_as_sent(INVOICE_ID.to_string(), "recovered refund receipt checked".to_string());
         let closed_recovered = recovered.invoices.get(&INVOICE_ID.to_string()).unwrap();
         assert_eq!(closed_recovered.status, InvoiceStatus::Refunded);
