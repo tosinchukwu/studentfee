@@ -1582,6 +1582,45 @@ mod tests {
     }
 
     #[test]
+    fn treasury_change_rechecks_registration_after_delay_and_ignores_stale_callbacks() {
+        let (mut contract, _, _) = funded_contract();
+        context("school.testnet", 4, None);
+        let _failed_check = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        context("registry.testnet", 5, Some(PromiseResult::Failed));
+        assert!(!contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        let after_failure = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        assert_eq!(after_failure.queued_treasury, None);
+
+        context("school.testnet", 6, None);
+        let _queue = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        let storage_balance = StorageBalance { total: U128(1), available: U128(0) };
+        let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
+        context("registry.testnet", 7, Some(PromiseResult::Successful(result.clone())));
+        assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        let queued = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        let effective = queued.treasury_effective_at.unwrap();
+        assert_eq!(effective, 7 + TREASURY_DELAY_NS);
+
+        context("school.testnet", effective - 1, None);
+        let too_early = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.apply_treasury_change(SCHOOL_ID.to_string());
+        }));
+        assert!(too_early.is_err());
+
+        context("school.testnet", effective, None);
+        let _apply = contract.apply_treasury_change(SCHOOL_ID.to_string());
+        context("registry.testnet", effective + 1, Some(PromiseResult::Successful(result)));
+        assert!(contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        let changed = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        assert_eq!(changed.treasury, account("new-treasury.testnet"));
+        assert_eq!(changed.queued_treasury, None);
+        assert_eq!(contract.treasury_index.get(&account("treasury.testnet")), None);
+        assert_eq!(contract.treasury_index.get(&account("new-treasury.testnet")), Some(SCHOOL_ID.to_string()));
+        assert!(!contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().treasury, account("new-treasury.testnet"));
+    }
+
+    #[test]
     fn only_one_treasury_change_can_be_pending_at_a_time() {
         let (mut contract, _, _) = funded_contract();
         context("school.testnet", 4, None);
