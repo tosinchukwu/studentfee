@@ -1564,6 +1564,32 @@ mod tests {
     }
 
     #[test]
+    fn two_step_school_admin_transfer_updates_the_unique_admin_index() {
+        let (mut contract, _, _) = funded_contract();
+        let replacement = account("replacement-admin.testnet");
+        context("school.testnet", 4, None);
+        contract.propose_admin(SCHOOL_ID.to_string(), replacement.clone());
+        assert_eq!(contract.admin_index.get(&account("school.testnet")), Some(SCHOOL_ID.to_string()));
+
+        context("replacement-admin.testnet", 5, None);
+        contract.accept_admin(SCHOOL_ID.to_string());
+        let school = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        assert_eq!(school.admin, replacement);
+        assert_eq!(school.proposed_admin, None);
+        assert_eq!(contract.admin_index.get(&account("school.testnet")), None);
+        assert_eq!(contract.admin_index.get(&account("replacement-admin.testnet")), Some(SCHOOL_ID.to_string()));
+
+        context("school.testnet", 6, None);
+        let old_admin = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.create_invoice(SCHOOL_ID.to_string(), "abcdef0123456789abcdef0123456789".to_string(), U128(GROSS), 0);
+        }));
+        assert!(old_admin.is_err());
+        context("replacement-admin.testnet", 7, None);
+        contract.create_invoice(SCHOOL_ID.to_string(), "abcdef0123456789abcdef0123456789".to_string(), U128(GROSS), 0);
+        assert_eq!(contract.invoices.get(&"abcdef0123456789abcdef0123456789".to_string()).unwrap().status, InvoiceStatus::Pending);
+    }
+
+    #[test]
     fn pending_school_cannot_transfer_administration() {
         let (mut contract, _, _) = funded_contract();
         let mut school = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
