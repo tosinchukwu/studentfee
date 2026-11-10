@@ -1683,6 +1683,70 @@ mod tests {
     }
 
     #[test]
+    fn an_invoice_can_use_at_most_two_collateral_recoveries() {
+        let (mut contract, _, _) = funded_contract();
+        contract.fees_available = 2 * NET;
+        context("anyone.testnet", 4, None);
+        let _first = contract.settle_invoice(INVOICE_ID.to_string());
+
+        context("owner.testnet", 4 + WAIT_NS, None);
+        contract.retry_with_collateral(INVOICE_ID.to_string(), "first recovery".to_string());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().recovery_count, 1);
+
+        context("school.testnet", 4 + 2 * WAIT_NS, None);
+        let _restart_one = contract.restart_settlement(INVOICE_ID.to_string());
+        context("registry.testnet", 4 + 2 * WAIT_NS + 1, Some(PromiseResult::Failed));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 3, OperationType::Settle));
+
+        context("school.testnet", 4 + 3 * WAIT_NS + 1, None);
+        let _restart_two = contract.restart_settlement(INVOICE_ID.to_string());
+        context("registry.testnet", 4 + 3 * WAIT_NS + 2, Some(PromiseResult::Failed));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 4, OperationType::Settle));
+
+        context("owner.testnet", 4 + 4 * WAIT_NS + 2, None);
+        contract.retry_with_collateral(INVOICE_ID.to_string(), "second recovery".to_string());
+        let second_recovery = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(second_recovery.recovery_count, 2);
+        assert_eq!(second_recovery.attempt_counter, 5);
+        assert_eq!(contract.lifetime_collateral, 2 * NET);
+        assert_eq!(contract.fees_available, 0);
+
+        context("school.testnet", 4 + 5 * WAIT_NS + 2, None);
+        let _restart_three = contract.restart_settlement(INVOICE_ID.to_string());
+        let third_frozen = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(third_frozen.status, InvoiceStatus::Settling);
+        assert_eq!(third_frozen.attempt_counter, 6);
+
+        context("owner.testnet", 4 + 6 * WAIT_NS + 2, None);
+        let third_recovery = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.retry_with_collateral(INVOICE_ID.to_string(), "must be rejected".to_string());
+        }));
+        assert!(third_recovery.is_err());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().recovery_count, 2);
+        contract.close_as_sent(INVOICE_ID.to_string(), "third recovery not allowed".to_string());
+        let closed = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(closed.status, InvoiceStatus::Paid);
+        assert_eq!(closed.attempt_counter, 7);
+        assert_eq!(contract.lifetime_collateral, 2 * NET);
+    }
+
+    #[test]
+    fn disabling_collateral_recovery_keeps_frozen_invoice_closeable() {
+        let (mut contract, _, _) = funded_contract();
+        context("anyone.testnet", 4, None);
+        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        contract.allow_retry = false;
+        context("owner.testnet", 4 + WAIT_NS, None);
+        let retry = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.retry_with_collateral(INVOICE_ID.to_string(), "disabled".to_string());
+        }));
+        assert!(retry.is_err());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Settling);
+        contract.close_as_sent(INVOICE_ID.to_string(), "explorer verified".to_string());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Paid);
+    }
+
+    #[test]
     fn school_admin_cannot_cancel_another_schools_invoice() {
         let (mut contract, _, _) = funded_contract();
         let other_admin = account("other-school.testnet");
