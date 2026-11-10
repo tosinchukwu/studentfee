@@ -1238,6 +1238,8 @@ mod tests {
             queued_treasury: None,
             treasury_effective_at: None,
             proposed_admin: None,
+            reactivation_pending: false,
+            reactivation_started_at: None,
         };
         contract.schools.insert(&SECOND_SCHOOL.to_string(), &second_school);
         contract.admin_index.insert(&second_admin, &SECOND_SCHOOL.to_string());
@@ -1933,6 +1935,8 @@ mod tests {
             queued_treasury: None,
             treasury_effective_at: None,
             proposed_admin: None,
+            reactivation_pending: false,
+            reactivation_started_at: None,
         };
         contract.schools.insert(&other_school.school_id, &other_school);
         contract.admin_index.insert(&other_admin, &other_school.school_id);
