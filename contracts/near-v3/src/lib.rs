@@ -1480,6 +1480,69 @@ mod tests {
     }
 
     #[test]
+    fn fee_rate_changes_apply_only_to_invoices_created_after_the_change() {
+        let (mut contract, _, _) = funded_contract();
+        context("owner.testnet", 4, None);
+        contract.set_school_fee(SCHOOL_ID.to_string(), 500);
+        context("school.testnet", 5, None);
+        const NEW_ID: &str = "abcdef0123456789abcdef0123456789";
+        contract.create_invoice(SCHOOL_ID.to_string(), NEW_ID.to_string(), U128(GROSS), 0);
+        context("usdc.testnet", 6, None);
+        let accepted = contract.ft_on_transfer(account("parent-two.testnet"), U128(GROSS), NEW_ID.to_string());
+        assert!(matches!(accepted, PromiseOrValue::Value(value) if value.0 == 0));
+
+        let old_invoice = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        let new_invoice = contract.invoices.get(&NEW_ID.to_string()).unwrap();
+        assert_eq!(old_invoice.fee_bps, 100);
+        assert_eq!(old_invoice.fee_amount, FEE);
+        assert_eq!(new_invoice.fee_bps, 500);
+        assert_eq!(new_invoice.fee_amount, 5_000_000);
+        assert_eq!(new_invoice.net_amount, GROSS - 5_000_000);
+    }
+
+    #[test]
+    fn pause_blocks_new_payments_and_settlement_but_allows_refund_and_cancellation() {
+        let (mut contract, _, _) = funded_contract();
+        const PENDING_ID: &str = "abcdef0123456789abcdef0123456789";
+        const OTHER_PENDING_ID: &str = "fedcba9876543210fedcba9876543210";
+        context("school.testnet", 4, None);
+        contract.create_invoice(SCHOOL_ID.to_string(), PENDING_ID.to_string(), U128(GROSS), 0);
+        contract.create_invoice(SCHOOL_ID.to_string(), OTHER_PENDING_ID.to_string(), U128(GROSS), 0);
+        contract.platform_treasury = Some(account("platform-treasury.testnet"));
+        contract.platform_treasury_verified = true;
+        contract.fees_available = FEE;
+
+        context("owner.testnet", 5, None);
+        contract.pause();
+        let settle = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.settle_invoice(INVOICE_ID.to_string());
+        }));
+        assert!(settle.is_err());
+        let create = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.create_invoice(SCHOOL_ID.to_string(), "00112233445566778899aabbccddeeff".to_string(), U128(GROSS), 0);
+        }));
+        assert!(create.is_err());
+        let withdraw = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.withdraw_fees(U128(FEE));
+        }));
+        assert!(withdraw.is_err());
+
+        context("usdc.testnet", 6, None);
+        let returned = contract.ft_on_transfer(account("parent-three.testnet"), U128(GROSS), PENDING_ID.to_string());
+        assert!(matches!(returned, PromiseOrValue::Value(value) if value.0 == GROSS));
+        assert_eq!(contract.invoices.get(&PENDING_ID.to_string()).unwrap().status, InvoiceStatus::Pending);
+
+        context("school.testnet", 7, None);
+        contract.cancel_invoice(OTHER_PENDING_ID.to_string());
+        let _refund = contract.refund_payment(INVOICE_ID.to_string());
+        assert_eq!(contract.invoices.get(&OTHER_PENDING_ID.to_string()).unwrap().status, InvoiceStatus::Cancelled);
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Refunding);
+        context("registry.testnet", 8, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Refund));
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Refunded);
+    }
+
+    #[test]
     fn fee_rounding_and_limits_are_exact() {
         assert_eq!(1u128 * DEFAULT_FEE_BPS as u128 / BPS, 0);
         assert_eq!(100u128 * DEFAULT_FEE_BPS as u128 / BPS, 1);
