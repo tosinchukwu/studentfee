@@ -471,22 +471,37 @@ impl Contract {
         self.assert_owner();
         self.ensure_async_resources();
         require!(fee_bps <= MAX_FEE_BPS, "Platform fee exceeds 5%");
-        let school = self.schools.get(&school_id).expect("School not found");
+        let mut school = self.schools.get(&school_id).expect("School not found");
         require!(school.status == SchoolStatus::PendingApproval, "School is not awaiting approval");
         require!(school.treasury_verified, "Treasury has not been verified");
+        require!(!school.approval_pending, "School approval is already pending");
+        school.approval_pending = true;
+        school.approval_started_at = Some(env::block_timestamp());
+        school.approval_nonce = school.approval_nonce.checked_add(1).expect("Approval nonce overflow");
+        let nonce = school.approval_nonce;
+        let treasury = school.treasury.clone();
+        self.schools.insert(&school_id, &school);
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
-            .storage_balance_of(school.treasury)
+            .storage_balance_of(treasury.clone())
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
-                .on_approval_treasury_check(school_id, fee_bps))
+                .on_approval_treasury_check(school_id, fee_bps, treasury, nonce))
     }
 
     #[private]
-    pub fn on_approval_treasury_check(&mut self, school_id: String, fee_bps: u16) -> bool {
+    pub fn on_approval_treasury_check(&mut self, school_id: String, fee_bps: u16, expected_treasury: AccountId, nonce: u64) -> bool {
         let registered = Self::storage_balance_result();
-        if !registered { return false; }
         if let Some(mut school) = self.schools.get(&school_id) {
-            if school.status != SchoolStatus::PendingApproval { return false; }
+            if school.status != SchoolStatus::PendingApproval
+                || !school.approval_pending
+                || school.approval_nonce != nonce
+                || school.treasury != expected_treasury { return false; }
+            school.approval_pending = false;
+            school.approval_started_at = None;
+            if !registered {
+                self.schools.insert(&school_id, &school);
+                return false;
+            }
             school.status = SchoolStatus::Active;
             school.treasury_verified = true;
             school.fee_bps = fee_bps;
@@ -494,6 +509,18 @@ impl Contract {
             env::log_str(&format!("SCHOOL_ACTIVATED:{}", school_id));
             true
         } else { false }
+    }
+
+    pub fn cancel_school_approval(&mut self, school_id: String) {
+        self.assert_owner();
+        let mut school = self.schools.get(&school_id).expect("School not found");
+        require!(school.status == SchoolStatus::PendingApproval && school.approval_pending, "No school approval is pending");
+        let started = school.approval_started_at.expect("Approval start time missing");
+        require!(env::block_timestamp() >= started.saturating_add(WAIT_NS), "School approval cancellation delay has not elapsed");
+        school.approval_pending = false;
+        school.approval_started_at = None;
+        school.approval_nonce = school.approval_nonce.checked_add(1).expect("Approval nonce overflow");
+        self.schools.insert(&school_id, &school);
     }
 
     pub fn suspend_school(&mut self, school_id: String) {
