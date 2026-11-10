@@ -473,6 +473,7 @@ impl Contract {
     pub fn accept_admin(&mut self, school_id: String) {
         let mut school = self.schools.get(&school_id).expect("School not found");
         let caller = env::predecessor_account_id();
+        require!(school.queued_treasury.is_none(), "Finish the queued treasury change before transferring administration");
         require!(school.proposed_admin.as_ref() == Some(&caller), "Not the proposed administrator");
         require!(caller != self.owner && self.admin_index.get(&caller).is_none(), "Administrator is unavailable");
         require!(self.treasury_index.get(&caller).is_none(), "A treasury account cannot become an administrator");
@@ -545,7 +546,11 @@ impl Contract {
     pub fn on_apply_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool {
         if !Self::storage_balance_result() { return false; }
         if let Some(mut school) = self.schools.get(&school_id) {
-            if self.treasury_index.get(&new_treasury).is_some() || self.platform_treasury.as_ref() == Some(&new_treasury) || self.admin_index.get(&new_treasury).is_some() { return false; }
+            if school.queued_treasury.as_ref() != Some(&new_treasury)
+                || school.treasury_effective_at.map(|time| env::block_timestamp() >= time) != Some(true)
+                || self.treasury_index.get(&new_treasury).is_some()
+                || self.platform_treasury.as_ref() == Some(&new_treasury)
+                || self.admin_index.get(&new_treasury).is_some() { return false; }
             self.treasury_index.remove(&school.treasury);
             self.treasury_index.insert(&new_treasury, &school_id);
             school.treasury = new_treasury;
