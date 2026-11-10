@@ -222,7 +222,20 @@ export default function PayPage({ id }: { id: string }) {
   const chain = invoice.chainStatus
   return (
     <PageShell schoolName={invoice.schoolName} right={wallet}>
-      <div className="mx-auto max-w-lg space-y-4">
+      <div className="mx-auto max-w-2xl space-y-4 sm:space-y-5">
+        <div className="rounded-2xl bg-[#101D35] px-5 py-4 text-white shadow-card sm:px-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-200">StudentFee secure checkout</p>
+              <p className="mt-1 text-sm text-white/80">School fee payment portal</p>
+            </div>
+            <span className="rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold text-teal-100 ring-1 ring-white/15">USDC · NEAR</span>
+          </div>
+          <div className="mt-4 flex items-center gap-2 text-xs text-white/75">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            Payment status is checked against the NEAR network
+          </div>
+        </div>
         <Card className="space-y-6">
           <Details invoice={invoice} />
 
@@ -248,11 +261,21 @@ export default function PayPage({ id }: { id: string }) {
                   {isAndroid && !accountId && (
                     <p className="text-center text-xs text-slate-500">Using NEAR Mobile? It must be set to the Testnet network to approve test payments.</p>
                   )}
-                  <p className="text-center text-xs text-slate-500">
-                    {accountId
-                      ? `Paying from ${accountId}${balance !== null ? ` · Balance $${formatAmount(balance)}` : ''}`
-                      : 'You will confirm the payment in your NEAR wallet. We never see your keys.'}
-                  </p>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <span className="text-slate-600">Payment method</span>
+                      <span className="font-semibold text-ink">USDC on NEAR</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                      <span className="text-slate-600">Network fee</span>
+                      <span className="font-medium text-ink">Paid in NEAR</span>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      {accountId
+                        ? `Connected wallet: ${accountId}${balance !== null ? ` · USDC balance: ${formatAmount(balance)}` : ''}`
+                        : 'Your wallet will ask you to approve the payment. StudentFee never has access to your recovery phrase or private keys.'}
+                    </p>
+                  </div>
                 </>
               )}
 
