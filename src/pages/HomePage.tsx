@@ -97,6 +97,25 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
           </Card>
         </section>
 
+        <section className="grid gap-5 lg:grid-cols-2" aria-label="Choose your workspace">
+          <Card className="flex flex-col justify-between gap-5 border-2 border-teal-200 bg-gradient-to-br from-white to-teal-50/60">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-teal-100 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-teal-800"><BadgeCheck className="h-3.5 w-3.5" /> Available now · Standard v2</div>
+              <h2 className="mt-4 font-display text-2xl font-semibold tracking-tight text-ink">Standard school workspace</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Continue using the existing single-school fee office, invoices, parent links and payment history. Your current NEAR Testnet v2 setup stays as it is.</p>
+            </div>
+            <Link href="/admin" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#101D35] px-5 text-sm font-semibold text-white transition hover:bg-[#1A2D4D]">Open Standard workspace <ArrowRight className="h-4 w-4" /></Link>
+          </Card>
+          <Card className="flex flex-col justify-between gap-5 border border-indigo-200 bg-gradient-to-br from-white to-indigo-50/60">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-indigo-800"><GraduationCap className="h-3.5 w-3.5" /> v3 setup · Preview</div>
+              <h2 className="mt-4 font-display text-2xl font-semibold tracking-tight text-ink">Multi-school platform</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">A separate platform for registering multiple schools, assigning each school its own administrator and treasury, and keeping every school's fee records isolated.</p>
+            </div>
+            <Link href="/multischool" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-white px-5 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-50">Explore v3 setup preview <ArrowRight className="h-4 w-4" /></Link>
+          </Card>
+        </section>
+
         <section className="grid gap-4 rounded-2xl border border-slate-200 bg-white/70 p-5 sm:grid-cols-3 sm:p-6">
           {[
             { title: 'Create', body: 'The school creates an invoice with the student, term, amount and due date.' },
