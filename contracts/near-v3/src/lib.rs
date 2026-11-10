@@ -967,16 +967,18 @@ impl Contract {
         require!(self.treasury_index.get(&account_id).is_none(), "A school treasury cannot be the platform treasury");
         self.pending_platform_treasury = Some(account_id.clone());
         self.pending_platform_treasury_started_at = Some(env::block_timestamp());
+        self.pending_platform_treasury_nonce = self.pending_platform_treasury_nonce.checked_add(1).expect("Platform treasury nonce overflow");
+        let nonce = self.pending_platform_treasury_nonce;
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
             .storage_balance_of(account_id.clone())
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
-                .on_platform_treasury_check(account_id))
+                .on_platform_treasury_check(account_id, nonce))
     }
 
     #[private]
-    pub fn on_platform_treasury_check(&mut self, account_id: AccountId) -> bool {
-        if self.pending_platform_treasury.as_ref() != Some(&account_id) { return false; }
+    pub fn on_platform_treasury_check(&mut self, account_id: AccountId, nonce: u64) -> bool {
+        if self.pending_platform_treasury.as_ref() != Some(&account_id) || self.pending_platform_treasury_nonce != nonce { return false; }
         let registered = Self::storage_balance_result();
         let available = registered && account_id != self.owner && account_id != self.usdc_token
             && self.admin_index.get(&account_id).is_none()
@@ -996,6 +998,7 @@ impl Contract {
         require!(env::block_timestamp() >= started.saturating_add(WAIT_NS), "Platform treasury cancellation delay has not elapsed");
         self.pending_platform_treasury = None;
         self.pending_platform_treasury_started_at = None;
+        self.pending_platform_treasury_nonce = self.pending_platform_treasury_nonce.checked_add(1).expect("Platform treasury nonce overflow");
     }
 
     pub fn withdraw_fees(&mut self, amount: U128) -> Promise {
