@@ -486,12 +486,16 @@ impl Contract {
 
     pub fn queue_treasury_change(&mut self, school_id: String, new_treasury: AccountId) -> Promise {
         self.ensure_free_near_reserve();
-        let school = self.get_admin_school(&school_id);
+        let mut school = self.get_admin_school(&school_id);
+        require!(school.queued_treasury.is_none(), "A treasury change is already queued");
         require!(new_treasury != school.treasury, "Treasury is unchanged");
         require!(new_treasury != school.admin && new_treasury != self.owner && new_treasury != env::current_account_id(), "Treasury must be a separate account");
         require!(self.admin_index.get(&new_treasury).is_none(), "A school administrator cannot be a treasury");
         require!(self.treasury_index.get(&new_treasury).map(|id| id == school_id).unwrap_or(true), "Treasury is already assigned to another school");
         require!(self.platform_treasury.as_ref() != Some(&new_treasury), "Platform treasury cannot be a school treasury");
+        school.queued_treasury = Some(new_treasury.clone());
+        school.treasury_effective_at = None;
+        self.schools.insert(&school_id, &school);
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
             .storage_balance_of(new_treasury.clone())
