@@ -352,11 +352,11 @@ impl Contract {
     pub fn register_school(&mut self, name: String, description: String, treasury: AccountId) -> Promise {
         self.ensure_async_resources();
         let admin = env::predecessor_account_id();
-        require!(admin != self.owner && admin != env::current_account_id(), "Invalid school administrator");
+        require!(admin != self.owner && admin != env::current_account_id() && admin != self.usdc_token, "Invalid school administrator");
         require!(self.admin_index.get(&admin).is_none(), "Administrator already owns a school");
         require!(self.treasury_index.get(&admin).is_none(), "A school treasury cannot become an administrator");
         require!(self.platform_treasury.as_ref() != Some(&admin), "Platform treasury cannot become a school administrator");
-        require!(treasury != admin && treasury != self.owner && treasury != env::current_account_id(), "Treasury must be a separate account");
+        require!(treasury != admin && treasury != self.owner && treasury != env::current_account_id() && treasury != self.usdc_token, "Treasury must be a separate account");
         require!(self.treasury_index.get(&treasury).is_none(), "Treasury is already assigned to a school");
         require!(self.admin_index.get(&treasury).is_none(), "A school administrator cannot be a treasury");
         require!(self.platform_treasury.as_ref() != Some(&treasury), "Platform treasury cannot be a school treasury");
@@ -552,7 +552,7 @@ impl Contract {
     pub fn propose_admin(&mut self, school_id: String, new_admin: AccountId) {
         let mut school = self.get_admin_school(&school_id);
         require!(school.status == SchoolStatus::Active, "Only an active school can transfer administration");
-        require!(new_admin != self.owner && new_admin != env::current_account_id(), "Invalid school administrator");
+        require!(new_admin != self.owner && new_admin != env::current_account_id() && new_admin != self.usdc_token, "Invalid school administrator");
         require!(self.treasury_index.get(&new_admin).is_none(), "A treasury account cannot become an administrator");
         require!(self.platform_treasury.as_ref() != Some(&new_admin), "Platform treasury cannot become a school administrator");
         require!(new_admin != school.admin, "Already the school administrator");
@@ -567,7 +567,7 @@ impl Contract {
         require!(school.status == SchoolStatus::Active, "Only an active school can transfer administration");
         require!(school.queued_treasury.is_none(), "Finish the queued treasury change before transferring administration");
         require!(school.proposed_admin.as_ref() == Some(&caller), "Not the proposed administrator");
-        require!(caller != self.owner && self.admin_index.get(&caller).is_none(), "Administrator is unavailable");
+        require!(caller != self.owner && caller != self.usdc_token && self.admin_index.get(&caller).is_none(), "Administrator is unavailable");
         require!(self.treasury_index.get(&caller).is_none(), "A treasury account cannot become an administrator");
         require!(self.platform_treasury.as_ref() != Some(&caller), "Platform treasury cannot become a school administrator");
         self.admin_index.remove(&school.admin);
@@ -582,7 +582,7 @@ impl Contract {
         let mut school = self.get_admin_school(&school_id);
         require!(school.queued_treasury.is_none(), "A treasury change is already queued");
         require!(new_treasury != school.treasury, "Treasury is unchanged");
-        require!(new_treasury != school.admin && new_treasury != self.owner && new_treasury != env::current_account_id(), "Treasury must be a separate account");
+        require!(new_treasury != school.admin && new_treasury != self.owner && new_treasury != env::current_account_id() && new_treasury != self.usdc_token, "Treasury must be a separate account");
         require!(self.admin_index.get(&new_treasury).is_none(), "A school administrator cannot be a treasury");
         require!(self.treasury_index.get(&new_treasury).map(|id| id == school_id).unwrap_or(true), "Treasury is already assigned to another school");
         require!(self.platform_treasury.as_ref() != Some(&new_treasury), "Platform treasury cannot be a school treasury");
@@ -605,6 +605,7 @@ impl Contract {
             let available = Self::storage_balance_result()
                 && self.treasury_index.get(&new_treasury).is_none()
                 && self.platform_treasury.as_ref() != Some(&new_treasury)
+                && new_treasury != self.usdc_token
                 && self.admin_index.get(&new_treasury).is_none();
             if !available {
                 school.queued_treasury = None;
@@ -895,7 +896,7 @@ impl Contract {
         self.assert_owner();
         self.ensure_async_resources();
         require!(self.pending_platform_treasury.is_none(), "A platform treasury verification is already pending");
-        require!(account_id != self.owner && account_id != env::current_account_id(), "Platform treasury must be a separate account");
+        require!(account_id != self.owner && account_id != env::current_account_id() && account_id != self.usdc_token, "Platform treasury must be a separate account");
         require!(self.admin_index.get(&account_id).is_none(), "A school administrator cannot be the platform treasury");
         require!(self.treasury_index.get(&account_id).is_none(), "A school treasury cannot be the platform treasury");
         self.pending_platform_treasury = Some(account_id.clone());
@@ -911,7 +912,7 @@ impl Contract {
     pub fn on_platform_treasury_check(&mut self, account_id: AccountId) -> bool {
         if self.pending_platform_treasury.as_ref() != Some(&account_id) { return false; }
         let registered = Self::storage_balance_result();
-        let available = registered && account_id != self.owner
+        let available = registered && account_id != self.owner && account_id != self.usdc_token
             && self.admin_index.get(&account_id).is_none()
             && self.treasury_index.get(&account_id).is_none();
         self.pending_platform_treasury = None;
