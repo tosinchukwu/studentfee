@@ -1193,6 +1193,9 @@ mod tests {
         contract.retry_with_collateral(INVOICE_ID.to_string(), "explorer checked".to_string());
         let recovered = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
         assert_eq!(recovered.status, InvoiceStatus::SettlementRecovered);
+        context("registry.testnet", 4 + WAIT_NS + 1, Some(PromiseResult::Successful(vec![])));
+        assert!(!contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::SettlementRecovered);
         assert_eq!(recovered.recovery_count, 1);
         assert_eq!(recovered.attempt_counter, 2);
         assert_eq!(recovered.active_attempt_id, None);
@@ -1200,6 +1203,11 @@ mod tests {
         assert_eq!(contract.fees_available, 200_000_000 - NET);
         assert_eq!(contract.lifetime_collateral, NET);
 
+        context("school.testnet", 4 + 2 * WAIT_NS - 1, None);
+        let too_early = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.restart_settlement(INVOICE_ID.to_string())
+        }));
+        assert!(too_early.is_err());
         context("school.testnet", 4 + 2 * WAIT_NS, None);
         let _restart = contract.restart_settlement(INVOICE_ID.to_string());
         let restarted = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
@@ -1225,6 +1233,80 @@ mod tests {
         assert_eq!(closed.attempt_counter, 4);
         assert_eq!(contract.held, 0);
         assert_eq!(owner, account("owner.testnet"));
+        assert_eq!(admin, account("school.testnet"));
+    }
+
+    #[test]
+    fn school_admin_cannot_cancel_another_schools_invoice() {
+        let (mut contract, _, _) = funded_contract();
+        let other_admin = account("other-school.testnet");
+        let other_school = School {
+            school_id: "00000000000000000000000000000002".to_string(),
+            name: "Other School".to_string(),
+            description: "Isolation fixture".to_string(),
+            admin: other_admin.clone(),
+            treasury: account("other-treasury.testnet"),
+            status: SchoolStatus::Active,
+            treasury_verified: true,
+            fee_bps: DEFAULT_FEE_BPS,
+            storage_balance: 10_000_000_000_000_000_000_000_000,
+            created_at: 1,
+            queued_treasury: None,
+            treasury_effective_at: None,
+            proposed_admin: None,
+        };
+        contract.schools.insert(&other_school.school_id, &other_school);
+        contract.admin_index.insert(&other_admin, &other_school.school_id);
+        context("other-school.testnet", 4, None);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.cancel_invoice(INVOICE_ID.to_string());
+        }));
+        assert!(result.is_err());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::PaymentReceived);
+    }
+
+    #[test]
+    fn fee_withdrawal_uses_only_available_fees_and_restores_confirmed_failures() {
+        let (mut contract, owner, _) = funded_contract();
+        context("anyone.testnet", 4, None);
+        let _settlement = contract.settle_invoice(INVOICE_ID.to_string());
+        context("registry.testnet", 5, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+        assert_eq!(contract.fees_available, FEE);
+
+        contract.platform_treasury = Some(account("platform-treasury.testnet"));
+        contract.platform_treasury_verified = true;
+        context("owner.testnet", 6, None);
+        let _withdrawal = contract.withdraw_fees(U128(FEE));
+        assert_eq!(contract.fees_available, 0);
+        assert_eq!(contract.fees_in_flight, FEE);
+
+        context("registry.testnet", 7, Some(PromiseResult::Failed));
+        assert!(contract.on_fee_withdrawal_complete(0));
+        assert_eq!(contract.fees_in_flight, 0);
+        assert_eq!(contract.fees_available, FEE);
+        assert_eq!(owner, account("owner.testnet"));
+    }
+
+    #[test]
+    fn underpayment_overpayment_and_at_risk_cap_are_refunded_in_full() {
+        let (mut contract, _, admin) = funded_contract();
+        const SECOND_ID: &str = "fedcba9876543210fedcba9876543210";
+        context("school.testnet", 4, None);
+        contract.create_invoice(SCHOOL_ID.to_string(), SECOND_ID.to_string(), U128(GROSS), 0);
+
+        context("usdc.testnet", 5, None);
+        let under = contract.ft_on_transfer(account("parent.testnet"), U128(GROSS - 1), SECOND_ID.to_string());
+        assert!(matches!(under, PromiseOrValue::Value(value) if value.0 == GROSS - 1));
+        let over = contract.ft_on_transfer(account("parent.testnet"), U128(GROSS + 1), SECOND_ID.to_string());
+        assert!(matches!(over, PromiseOrValue::Value(value) if value.0 == GROSS + 1));
+        assert_eq!(contract.invoices.get(&SECOND_ID.to_string()).unwrap().status, InvoiceStatus::Pending);
+
+        contract.held = MAX_AT_RISK;
+        let capped = contract.ft_on_transfer(account("parent.testnet"), U128(GROSS), SECOND_ID.to_string());
+        assert!(matches!(capped, PromiseOrValue::Value(value) if value.0 == GROSS));
+        assert_eq!(contract.invoices.get(&SECOND_ID.to_string()).unwrap().status, InvoiceStatus::Pending);
+        assert_eq!(contract.held, MAX_AT_RISK);
         assert_eq!(admin, account("school.testnet"));
     }
 
