@@ -5,7 +5,7 @@ use near_sdk::{
     AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue,
     PromiseResult,
 };
-use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
+use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet, Vector};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 
 const BPS: u128 = 10_000;
@@ -249,7 +249,7 @@ pub struct Contract {
     schools: UnorderedMap<String, School>,
     invoices: UnorderedMap<String, Invoice>,
     used_invoice_ids: UnorderedSet<String>,
-    admin_index: LookupMap<AccountId, String>,
+    admin_index: LookupMap<AccountId, String>,\n    school_invoice_ids: LookupMap<String, Vector<String>>,
     withdrawals: UnorderedMap<u64, Withdrawal>,
     held: u128,                 // H
     settling_gross: u128,       // SI
@@ -278,7 +278,7 @@ impl Contract {
             schools: UnorderedMap::new(StorageKey::Schools),
             invoices: UnorderedMap::new(StorageKey::Invoices),
             used_invoice_ids: UnorderedSet::new(StorageKey::UsedInvoiceIds),
-            admin_index: LookupMap::new(StorageKey::AdminIndex),
+            admin_index: LookupMap::new(StorageKey::AdminIndex),\n            school_invoice_ids: LookupMap::new(StorageKey::SchoolInvoiceIds),
             withdrawals: UnorderedMap::new(StorageKey::Withdrawals),
             held: 0,
             settling_gross: 0,
@@ -783,7 +783,7 @@ impl Contract {
 
     pub fn get_school(&self, school_id: String) -> Option<SchoolView> { self.schools.get(&school_id).map(Into::into) }
     pub fn get_invoice(&self, invoice_id: String) -> Option<InvoiceView> { self.invoices.get(&invoice_id).map(Into::into) }
-    pub fn get_school_for_admin(&self, admin: AccountId) -> Option<String> { self.admin_index.get(&admin) }
+    pub fn get_school_for_admin(&self, admin: AccountId) -> Option<String> { self.admin_index.get(&admin) }\n    pub fn get_schools(&self, from_index: u64, limit: u64) -> Vec<SchoolView> {\n        self.schools.iter().skip(from_index as usize).take(limit.min(100) as usize).map(|(_, school)| school.into()).collect()\n    }\n    pub fn get_school_invoice_ids(&self, school_id: String, from_index: u64, limit: u64) -> Vec<String> {\n        self.school_invoice_ids.get(&school_id).map(|ids| ids.iter().skip(from_index as usize).take(limit.min(100) as usize).collect()).unwrap_or_default()\n    }\n    pub fn get_school_invoices(&self, school_id: String, from_index: u64, limit: u64) -> Vec<InvoiceView> {\n        self.get_school_invoice_ids(school_id, from_index, limit).into_iter().filter_map(|id| self.invoices.get(&id).map(Into::into)).collect()\n    }
     pub fn get_accounting(&self) -> Accounting {
         let min_liability = self.held + self.settling_fee + self.fees_available;
         let max_liability = self.held + self.settling_gross + self.refunding_gross + self.fees_available + self.fees_in_flight;
