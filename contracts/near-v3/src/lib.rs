@@ -31,6 +31,7 @@ enum StorageKey {
     Invoices,
     UsedInvoiceIds,
     AdminIndex,
+    TreasuryIndex,
     Withdrawals,
     SchoolInvoiceIds,
 }
@@ -255,6 +256,7 @@ pub struct Contract {
     invoices: UnorderedMap<String, Invoice>,
     used_invoice_ids: UnorderedSet<String>,
     admin_index: LookupMap<AccountId, String>,
+    treasury_index: LookupMap<AccountId, String>,
     school_invoice_ids: LookupMap<String, Vector<String>>,
     withdrawals: UnorderedMap<u64, Withdrawal>,
     held: u128,                 // H
@@ -285,6 +287,7 @@ impl Contract {
             invoices: UnorderedMap::new(StorageKey::Invoices),
             used_invoice_ids: UnorderedSet::new(StorageKey::UsedInvoiceIds),
             admin_index: LookupMap::new(StorageKey::AdminIndex),
+            treasury_index: LookupMap::new(StorageKey::TreasuryIndex),
             school_invoice_ids: LookupMap::new(StorageKey::SchoolInvoiceIds),
             withdrawals: UnorderedMap::new(StorageKey::Withdrawals),
             held: 0,
@@ -304,6 +307,10 @@ impl Contract {
         let admin = env::predecessor_account_id();
         require!(admin != self.owner, "Owner cannot be a school administrator");
         require!(self.admin_index.get(&admin).is_none(), "Administrator already owns a school");
+        require!(treasury != admin && treasury != self.owner && treasury != env::current_account_id(), "Treasury must be a separate account");
+        require!(self.treasury_index.get(&treasury).is_none(), "Treasury is already assigned to a school");
+        require!(self.admin_index.get(&treasury).is_none(), "A school administrator cannot be a treasury");
+        require!(self.platform_treasury.as_ref() != Some(&treasury), "Platform treasury cannot be a school treasury");
         require!(!name.trim().is_empty() && name.len() <= MAX_NAME, "Invalid school name");
         require!(description.len() <= MAX_DESCRIPTION, "Description is too long");
         require!(env::attached_deposit().as_yoctonear() > 0, "Prepaid storage deposit required");
@@ -336,17 +343,19 @@ impl Contract {
     #[private]
     pub fn on_school_treasury_check(&mut self, school_id: String, admin: AccountId) -> bool {
         let registered = Self::storage_balance_result();
-        if !registered {
-            if let Some(school) = self.schools.remove(&school_id) {
+        if let Some(mut school) = self.schools.get(&school_id) {
+            let treasury_available = self.treasury_index.get(&school.treasury).is_none()
+                && self.platform_treasury.as_ref() != Some(&school.treasury)
+                && self.admin_index.get(&school.treasury).is_none();
+            if !registered || !treasury_available || school.admin != admin {
+                self.schools.remove(&school_id);
                 self.admin_index.remove(&admin);
                 Promise::new(admin).transfer(NearToken::from_yoctonear(school.storage_balance));
+                env::log_str("SCHOOL_REGISTRATION_REJECTED_TREASURY_NOT_AVAILABLE");
+                return false;
             }
-            env::log_str("SCHOOL_REGISTRATION_REJECTED_TREASURY_NOT_REGISTERED");
-            return false;
-        }
-        if let Some(mut school) = self.schools.get(&school_id) {
-            if school.admin != admin { return false; }
             school.treasury_verified = true;
+            self.treasury_index.insert(&school.treasury, &school_id);
             self.schools.insert(&school_id, &school);
             env::log_str(&format!("SCHOOL_REGISTERED:{}", school_id));
             return true;
@@ -439,6 +448,7 @@ impl Contract {
     pub fn propose_admin(&mut self, school_id: String, new_admin: AccountId) {
         let mut school = self.get_admin_school(&school_id);
         require!(new_admin != self.owner && new_admin != env::current_account_id(), "Invalid school administrator");
+        require!(self.treasury_index.get(&new_admin).is_none(), "A treasury account cannot become an administrator");
         require!(new_admin != school.admin, "Already the school administrator");
         require!(self.admin_index.get(&new_admin).is_none(), "Account already administers a school");
         school.proposed_admin = Some(new_admin);
@@ -450,6 +460,7 @@ impl Contract {
         let caller = env::predecessor_account_id();
         require!(school.proposed_admin.as_ref() == Some(&caller), "Not the proposed administrator");
         require!(caller != self.owner && self.admin_index.get(&caller).is_none(), "Administrator is unavailable");
+        require!(self.treasury_index.get(&caller).is_none(), "A treasury account cannot become an administrator");
         self.admin_index.remove(&school.admin);
         school.admin = caller.clone();
         school.proposed_admin = None;
@@ -460,6 +471,10 @@ impl Contract {
     pub fn queue_treasury_change(&mut self, school_id: String, new_treasury: AccountId) -> Promise {
         let school = self.get_admin_school(&school_id);
         require!(new_treasury != school.treasury, "Treasury is unchanged");
+        require!(new_treasury != school.admin && new_treasury != self.owner && new_treasury != env::current_account_id(), "Treasury must be a separate account");
+        require!(self.admin_index.get(&new_treasury).is_none(), "A school administrator cannot be a treasury");
+        require!(self.treasury_index.get(&new_treasury).map(|id| id == school_id).unwrap_or(true), "Treasury is already assigned to another school");
+        require!(self.platform_treasury.as_ref() != Some(&new_treasury), "Platform treasury cannot be a school treasury");
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
             .storage_balance_of(new_treasury.clone())
@@ -470,6 +485,7 @@ impl Contract {
     #[private]
     pub fn on_queue_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool {
         if !Self::storage_balance_result() { return false; }
+        if self.treasury_index.get(&new_treasury).is_some() || self.platform_treasury.as_ref() == Some(&new_treasury) || self.admin_index.get(&new_treasury).is_some() { return false; }
         if let Some(mut school) = self.schools.get(&school_id) {
             school.queued_treasury = Some(new_treasury);
             school.treasury_effective_at = Some(env::block_timestamp().saturating_add(TREASURY_DELAY_NS));
@@ -483,6 +499,9 @@ impl Contract {
         let new_treasury = school.queued_treasury.clone().expect("No treasury change queued");
         let effective = school.treasury_effective_at.expect("No effective time");
         require!(env::block_timestamp() >= effective, "Treasury delay has not elapsed");
+        require!(self.treasury_index.get(&new_treasury).is_none(), "Treasury is already assigned to another school");
+        require!(self.admin_index.get(&new_treasury).is_none(), "A school administrator cannot be a treasury");
+        require!(self.platform_treasury.as_ref() != Some(&new_treasury), "Platform treasury cannot be a school treasury");
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
             .storage_balance_of(new_treasury.clone())
@@ -494,6 +513,9 @@ impl Contract {
     pub fn on_apply_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool {
         if !Self::storage_balance_result() { return false; }
         if let Some(mut school) = self.schools.get(&school_id) {
+            if self.treasury_index.get(&new_treasury).is_some() || self.platform_treasury.as_ref() == Some(&new_treasury) || self.admin_index.get(&new_treasury).is_some() { return false; }
+            self.treasury_index.remove(&school.treasury);
+            self.treasury_index.insert(&new_treasury, &school_id);
             school.treasury = new_treasury;
             school.treasury_verified = true;
             school.queued_treasury = None;
@@ -709,6 +731,9 @@ impl Contract {
 
     pub fn set_platform_treasury(&mut self, account_id: AccountId) -> Promise {
         self.assert_owner();
+        require!(account_id != self.owner && account_id != env::current_account_id(), "Platform treasury must be a separate account");
+        require!(self.admin_index.get(&account_id).is_none(), "A school administrator cannot be the platform treasury");
+        require!(self.treasury_index.get(&account_id).is_none(), "A school treasury cannot be the platform treasury");
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
             .storage_balance_of(account_id.clone())
@@ -718,7 +743,7 @@ impl Contract {
 
     #[private]
     pub fn on_platform_treasury_check(&mut self, account_id: AccountId) -> bool {
-        if !Self::storage_balance_result() { return false; }
+        if !Self::storage_balance_result() || self.admin_index.get(&account_id).is_some() || self.treasury_index.get(&account_id).is_some() { return false; }
         self.platform_treasury = Some(account_id);
         self.platform_treasury_verified = true;
         true
