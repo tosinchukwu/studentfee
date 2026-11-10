@@ -2139,6 +2139,50 @@ mod tests {
     }
 
     #[test]
+    fn collateral_recovery_and_close_are_owner_only_and_use_platform_fees() {
+        let (mut contract, _, _) = funded_contract();
+        context("anyone.testnet", 4, None);
+        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        contract.fees_available = NET - 1;
+
+        context("school.testnet", 4 + WAIT_NS, None);
+        let unauthorized_retry = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.retry_with_collateral(INVOICE_ID.to_string(), "not owner".to_string());
+        }));
+        assert!(unauthorized_retry.is_err());
+        let unauthorized_close = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.close_as_sent(INVOICE_ID.to_string(), "not owner".to_string());
+        }));
+        assert!(unauthorized_close.is_err());
+
+        context("owner.testnet", 4 + WAIT_NS, None);
+        let insufficient = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.retry_with_collateral(INVOICE_ID.to_string(), "insufficient fee pool".to_string());
+        }));
+        assert!(insufficient.is_err());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Settling);
+        assert_eq!(contract.held, 0);
+        assert_eq!(contract.fees_available, NET - 1);
+        assert_eq!(contract.lifetime_collateral, 0);
+
+        contract.fees_available = NET;
+        contract.retry_with_collateral(INVOICE_ID.to_string(), "platform fee collateral".to_string());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::SettlementRecovered);
+        assert_eq!(contract.held, GROSS);
+        assert_eq!(contract.fees_available, 0);
+        assert_eq!(contract.lifetime_collateral, NET);
+
+        context("school.testnet", 4 + 2 * WAIT_NS, None);
+        let unauthorized_recovered_close = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.close_as_sent(INVOICE_ID.to_string(), "not owner".to_string());
+        }));
+        assert!(unauthorized_recovered_close.is_err());
+        context("owner.testnet", 4 + 2 * WAIT_NS, None);
+        contract.close_as_sent(INVOICE_ID.to_string(), "owner verified".to_string());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Paid);
+    }
+
+    #[test]
     fn disabling_collateral_recovery_keeps_frozen_invoice_closeable() {
         let (mut contract, _, _) = funded_contract();
         context("anyone.testnet", 4, None);
