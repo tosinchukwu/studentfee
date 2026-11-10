@@ -112,7 +112,7 @@ export default function ParentPage() {
           </Card>
           <Card>
             <div className="flex items-center justify-between gap-3">
-              <div><p className="text-sm font-medium text-slate-500">In progress</p><p className="mt-2 font-display text-3xl font-semibold text-ink">${processingInvoices.length}</p><p className="mt-1 text-xs text-slate-500">Payment${processingInvoices.length === 1 ? "" : "s"} being confirmed</p></div>
+              <div><p className="text-sm font-medium text-slate-500">In progress</p><p className="mt-2 font-display text-3xl font-semibold text-ink">{processingInvoices.length}</p><p className="mt-1 text-xs text-slate-500">Payment${processingInvoices.length === 1 ? "" : "s"} being confirmed</p></div>
               <span className="rounded-2xl bg-sky-50 p-3 text-sky-700"><Clock3 className="h-5 w-5" /></span>
             </div>
           </Card>
