@@ -1191,6 +1191,42 @@ mod tests {
     }
 
     #[test]
+    fn school_registration_charges_measured_storage_and_refunds_full_deposit_on_failure() {
+        let owner = account("owner.testnet");
+        let token = account("usdc.testnet");
+        context("owner.testnet", 1, None);
+        let mut contract = Contract::new(owner, token);
+        let deposit = NearToken::from_near(1).as_yoctonear();
+
+        let mut builder = VMContextBuilder::new();
+        builder
+            .current_account_id(account("registry.testnet"))
+            .predecessor_account_id(account("new-school.testnet"))
+            .block_timestamp(2)
+            .account_balance(NearToken::from_near(10))
+            .prepaid_gas(Gas::from_tgas(300))
+            .attached_deposit(NearToken::from_yoctonear(deposit));
+        testing_env!(builder.build());
+
+        let _promise = contract.register_school(
+            "New School".to_string(),
+            "Registration test".to_string(),
+            account("new-treasury.testnet"),
+        );
+        let school_id = "00000000000000000000000000000000".to_string();
+        let school = contract.schools.get(&school_id).unwrap();
+        assert!(school.registration_storage_cost > 0);
+        assert_eq!(school.storage_balance + school.registration_storage_cost, deposit);
+        assert_eq!(contract.prepaid_storage_total, school.storage_balance);
+
+        context("registry.testnet", 3, Some(PromiseResult::Failed));
+        assert!(!contract.on_school_treasury_check(school_id.clone(), account("new-school.testnet")));
+        assert!(contract.schools.get(&school_id).is_none());
+        assert!(contract.admin_index.get(&account("new-school.testnet")).is_none());
+        assert_eq!(contract.prepaid_storage_total, 0);
+    }
+
+    #[test]
     fn treasury_accounts_cannot_register_as_school_administrators() {
         let (mut contract, _, _) = funded_contract();
         context("treasury.testnet", 4, None);
