@@ -1773,6 +1773,7 @@ mod tests {
         assert_eq!(contract.owner, account("owner.testnet"));
 
         contract.treasury_index.remove(&candidate);
+        contract.proposed_owner = None;
         context("school.testnet", 6, None);
         contract.propose_admin(SCHOOL_ID.to_string(), candidate.clone());
         contract.platform_treasury = Some(candidate.clone());
