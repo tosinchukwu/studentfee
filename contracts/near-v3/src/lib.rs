@@ -605,6 +605,7 @@ impl Contract {
         self.ensure_free_near_reserve();
         require!(env::prepaid_gas() >= MIN_CALL_GAS, "Attach more gas for storage withdrawal and callback");
         let mut school = self.get_admin_school(&school_id);
+        require!(school.status != SchoolStatus::PendingApproval, "Storage cannot be withdrawn before school activation");
         require!(amount.0 > 0 && amount.0 <= school.storage_balance, "Insufficient prepaid storage");
         let id = self.next_storage_withdrawal_id;
         self.next_storage_withdrawal_id = self.next_storage_withdrawal_id.checked_add(1).expect("Storage withdrawal id overflow");
