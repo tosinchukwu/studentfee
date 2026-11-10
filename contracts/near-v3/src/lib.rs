@@ -532,7 +532,7 @@ impl Contract {
 
     pub fn propose_owner(&mut self, new_owner: AccountId) {
         self.assert_owner();
-        require!(new_owner != self.owner && new_owner != env::current_account_id(), "Invalid owner");
+        require!(new_owner != self.owner && new_owner != env::current_account_id() && new_owner != self.usdc_token, "Invalid owner");
         require!(self.admin_index.get(&new_owner).is_none(), "A school administrator cannot become owner");
         require!(self.treasury_index.get(&new_owner).is_none(), "A school treasury cannot become owner");
         require!(self.platform_treasury.as_ref() != Some(&new_owner), "Platform treasury cannot become owner");
@@ -542,6 +542,7 @@ impl Contract {
     pub fn accept_owner(&mut self) {
         let caller = env::predecessor_account_id();
         require!(self.proposed_owner.as_ref() == Some(&caller), "Not the proposed owner");
+        require!(caller != self.usdc_token, "USDC token cannot become owner");
         require!(self.admin_index.get(&caller).is_none(), "A school administrator cannot become owner");
         require!(self.treasury_index.get(&caller).is_none(), "A school treasury cannot become owner");
         require!(self.platform_treasury.as_ref() != Some(&caller), "Platform treasury cannot become owner");
@@ -652,6 +653,7 @@ impl Contract {
                 || school.treasury_effective_at.map(|time| env::block_timestamp() >= time) != Some(true)
                 || self.treasury_index.get(&new_treasury).is_some()
                 || self.platform_treasury.as_ref() == Some(&new_treasury)
+                || new_treasury == self.usdc_token
                 || self.admin_index.get(&new_treasury).is_some() { return false; }
             self.treasury_index.remove(&school.treasury);
             self.treasury_index.insert(&new_treasury, &school_id);
