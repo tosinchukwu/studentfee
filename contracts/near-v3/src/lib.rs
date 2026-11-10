@@ -285,11 +285,11 @@ trait ExtFt {
 #[ext_contract(ext_self)]
 trait ExtSelf {
     fn on_school_treasury_check(&mut self, school_id: String, admin: AccountId) -> bool;
-    fn on_queue_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool;
-    fn on_apply_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool;
-    fn on_reactivate_school_check(&mut self, school_id: String) -> bool;
-    fn on_approval_treasury_check(&mut self, school_id: String, fee_bps: u16) -> bool;
-    fn on_platform_treasury_check(&mut self, account_id: AccountId) -> bool;
+    fn on_queue_treasury_check(&mut self, school_id: String, new_treasury: AccountId, nonce: u64) -> bool;
+    fn on_apply_treasury_check(&mut self, school_id: String, new_treasury: AccountId, nonce: u64) -> bool;
+    fn on_reactivate_school_check(&mut self, school_id: String, expected_treasury: AccountId, nonce: u64) -> bool;
+    fn on_approval_treasury_check(&mut self, school_id: String, fee_bps: u16, expected_treasury: AccountId, nonce: u64) -> bool;
+    fn on_platform_treasury_check(&mut self, account_id: AccountId, nonce: u64) -> bool;
     fn on_transfer_complete(&mut self, invoice_id: String, attempt_id: u64, operation: OperationType) -> bool;
     fn on_fee_withdrawal_complete(&mut self, withdrawal_id: u64) -> bool;
     fn on_storage_withdrawal_complete(&mut self, withdrawal_id: u64) -> bool;
