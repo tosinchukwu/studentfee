@@ -996,14 +996,71 @@ impl FungibleTokenReceiver for Contract {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use near_sdk::test_utils::{testing_env_with_promise_results, VMContextBuilder};
+    use near_sdk::{testing_env, NearToken};
+
+    const GROSS: u128 = 100_000_000; // 100 USDC
+    const FEE: u128 = 1_000_000;     // 1 USDC at 1%
+    const NET: u128 = 99_000_000;    // 99 USDC
+    const SCHOOL_ID: &str = "00000000000000000000000000000001";
+    const INVOICE_ID: &str = "0123456789abcdef0123456789abcdef";
+
+    fn account(value: &str) -> AccountId { value.parse().unwrap() }
+
+    fn context(predecessor: &str, timestamp: u64, result: Option<PromiseResult>) {
+        let mut builder = VMContextBuilder::new();
+        builder
+            .current_account_id(account("registry.testnet"))
+            .predecessor_account_id(account(predecessor))
+            .block_timestamp(timestamp)
+            .prepaid_gas(Gas::from_tgas(300))
+            .attached_deposit(NearToken::from_yoctonear(0));
+        match result {
+            Some(promise_result) => testing_env_with_promise_results(builder.build(), promise_result),
+            None => testing_env!(builder.build()),
+        }
+    }
+
+    fn funded_contract() -> (Contract, AccountId, AccountId) {
+        let owner = account("owner.testnet");
+        let admin = account("school.testnet");
+        let token = account("usdc.testnet");
+        context("owner.testnet", 1, None);
+        let mut contract = Contract::new(owner.clone(), token);
+        let school = School {
+            school_id: SCHOOL_ID.to_string(),
+            name: "Test School".to_string(),
+            description: "Contract test fixture".to_string(),
+            admin: admin.clone(),
+            treasury: account("treasury.testnet"),
+            status: SchoolStatus::Active,
+            treasury_verified: true,
+            fee_bps: DEFAULT_FEE_BPS,
+            storage_balance: 10_000_000_000_000_000_000_000_000,
+            created_at: 1,
+            queued_treasury: None,
+            treasury_effective_at: None,
+            proposed_admin: None,
+        };
+        contract.schools.insert(&SCHOOL_ID.to_string(), &school);
+        contract.admin_index.insert(&admin, &SCHOOL_ID.to_string());
+
+        context("school.testnet", 2, None);
+        contract.create_invoice(SCHOOL_ID.to_string(), INVOICE_ID.to_string(), U128(GROSS), 0);
+
+        context("usdc.testnet", 3, None);
+        let accepted = contract.ft_on_transfer(account("parent.testnet"), U128(GROSS), INVOICE_ID.to_string());
+        assert!(matches!(accepted, PromiseOrValue::Value(value) if value.0 == 0));
+        (contract, owner, admin)
+    }
 
     #[test]
     fn fee_rounding_and_limits_are_exact() {
         assert_eq!(1u128 * DEFAULT_FEE_BPS as u128 / BPS, 0);
         assert_eq!(100u128 * DEFAULT_FEE_BPS as u128 / BPS, 1);
-        assert_eq!(1_000_000_000u128, MAX_INVOICE);
-        assert_eq!(5_000_000_000u128, MAX_AT_RISK);
-        assert_eq!(1_000_000_000u128, MAX_LIFETIME_COLLATERAL);
+        assert_eq!(MAX_INVOICE, 1_000_000_000);
+        assert_eq!(MAX_AT_RISK, 5_000_000_000);
+        assert_eq!(MAX_LIFETIME_COLLATERAL, 1_000_000_000);
     }
 
     #[test]
@@ -1015,9 +1072,150 @@ mod tests {
     }
 
     #[test]
-    fn recovered_statuses_are_distinct_and_terminal_statuses_are_explicit() {
-        assert_ne!(InvoiceStatus::SettlementRecovered, InvoiceStatus::RefundRecovered);
-        assert_ne!(InvoiceStatus::Paid, InvoiceStatus::Refunded);
-        assert_ne!(InvoiceStatus::Refunded, InvoiceStatus::Pending);
+    fn exact_payment_snapshots_payer_treasury_and_fee_once() {
+        let (contract, _, _) = funded_contract();
+        let invoice = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(invoice.status, InvoiceStatus::PaymentReceived);
+        assert_eq!(invoice.amount, GROSS);
+        assert_eq!(invoice.payer, Some(account("parent.testnet")));
+        assert_eq!(invoice.treasury_snapshot, Some(account("treasury.testnet")));
+        assert_eq!(invoice.fee_bps, DEFAULT_FEE_BPS);
+        assert_eq!(invoice.fee_amount, FEE);
+        assert_eq!(invoice.net_amount, NET);
+        assert_eq!(invoice.paid_at, Some(3));
+        assert_eq!(contract.held, GROSS);
+    }
+
+    #[test]
+    fn successful_settlement_credits_only_the_snapshotted_fee() {
+        let (mut contract, _, _) = funded_contract();
+        context("anyone.testnet", 4, None);
+        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        let settling = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(settling.status, InvoiceStatus::Settling);
+        assert_eq!(settling.operation_recipient, Some(account("treasury.testnet")));
+        assert_eq!(settling.operation_amount, NET);
+        assert_eq!(settling.attempt_counter, 1);
+        assert_eq!(contract.held, 0);
+        assert_eq!(contract.settling_gross, GROSS);
+        assert_eq!(contract.settling_fee, FEE);
+
+        context("registry.testnet", 5, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+        let paid = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(paid.status, InvoiceStatus::Paid);
+        assert_eq!(paid.operation_type, None);
+        assert_eq!(paid.active_attempt_id, None);
+        assert_eq!(contract.settling_gross, 0);
+        assert_eq!(contract.settling_fee, 0);
+        assert_eq!(contract.fees_available, FEE);
+    }
+
+    #[test]
+    fn failed_settlement_returns_to_payment_received_and_can_be_refunded() {
+        let (mut contract, _, admin) = funded_contract();
+        context("anyone.testnet", 4, None);
+        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        context("registry.testnet", 5, Some(PromiseResult::Failed));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+        let invoice = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(invoice.status, InvoiceStatus::PaymentReceived);
+        assert_eq!(invoice.operation_type, None);
+        assert_eq!(invoice.active_attempt_id, None);
+        assert_eq!(contract.held, GROSS);
+        assert_eq!(contract.settling_gross, 0);
+        assert_eq!(contract.settling_fee, 0);
+
+        context("school.testnet", 6, None);
+        let _refund = contract.refund_payment(INVOICE_ID.to_string());
+        let refunding = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(refunding.status, InvoiceStatus::Refunding);
+        assert_eq!(refunding.operation_recipient, Some(account("parent.testnet")));
+        assert_eq!(refunding.operation_amount, GROSS);
+        assert_eq!(refunding.attempt_counter, 2);
+
+        context("registry.testnet", 7, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 2, OperationType::Refund));
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Refunded);
+        assert_eq!(contract.held, 0);
+        assert_eq!(contract.refunding_gross, 0);
+        assert_eq!(contract.fees_available, 0);
+        let _ = admin;
+    }
+
+    #[test]
+    fn refunded_invoice_rejects_a_second_payment() {
+        let (mut contract, _, _) = funded_contract();
+        context("school.testnet", 4, None);
+        let _refund = contract.refund_payment(INVOICE_ID.to_string());
+        context("registry.testnet", 5, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Refund));
+        context("usdc.testnet", 6, None);
+        let returned = contract.ft_on_transfer(account("another-parent.testnet"), U128(GROSS), INVOICE_ID.to_string());
+        assert!(matches!(returned, PromiseOrValue::Value(value) if value.0 == GROSS));
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Refunded);
+        assert_eq!(contract.held, 0);
+    }
+
+    #[test]
+    fn recovered_settlement_can_only_restart_as_settlement_or_close() {
+        let (mut contract, owner, admin) = funded_contract();
+        contract.fees_available = 200_000_000;
+        context("anyone.testnet", 4, None);
+        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+
+        context("owner.testnet", 4 + WAIT_NS, None);
+        contract.retry_with_collateral(INVOICE_ID.to_string(), "explorer checked".to_string());
+        let recovered = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(recovered.status, InvoiceStatus::SettlementRecovered);
+        assert_eq!(recovered.recovery_count, 1);
+        assert_eq!(recovered.attempt_counter, 2);
+        assert_eq!(recovered.active_attempt_id, None);
+        assert_eq!(contract.held, GROSS);
+        assert_eq!(contract.fees_available, 200_000_000 - NET);
+        assert_eq!(contract.lifetime_collateral, NET);
+
+        context("school.testnet", 4 + 2 * WAIT_NS, None);
+        let _restart = contract.restart_settlement(INVOICE_ID.to_string());
+        let restarted = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(restarted.status, InvoiceStatus::Settling);
+        assert_eq!(restarted.attempt_counter, 3);
+        assert_eq!(restarted.operation_recipient, Some(account("treasury.testnet")));
+
+        context("registry.testnet", 4 + 2 * WAIT_NS + 1, Some(PromiseResult::Failed));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 3, OperationType::Settle));
+        let failed_restart = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(failed_restart.status, InvoiceStatus::SettlementRecovered);
+        assert_eq!(failed_restart.operation_type, Some(OperationType::Settle));
+        assert_eq!(failed_restart.recovery_count, 1);
+        assert_eq!(failed_restart.attempt_counter, 3);
+        assert_eq!(contract.held, GROSS);
+
+        context("owner.testnet", 4 + 3 * WAIT_NS + 2, None);
+        contract.close_as_sent(INVOICE_ID.to_string(), "verified payout outcome".to_string());
+        let closed = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(closed.status, InvoiceStatus::Paid);
+        assert_eq!(closed.operation_type, None);
+        assert_eq!(closed.active_attempt_id, None);
+        assert_eq!(closed.attempt_counter, 4);
+        assert_eq!(contract.held, 0);
+        assert_eq!(owner, account("owner.testnet"));
+        assert_eq!(admin, account("school.testnet"));
+    }
+
+    #[test]
+    fn stale_callback_cannot_change_a_closed_invoice() {
+        let (mut contract, _, _) = funded_contract();
+        context("anyone.testnet", 4, None);
+        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        context("owner.testnet", 4 + WAIT_NS, None);
+        contract.close_as_sent(INVOICE_ID.to_string(), "explorer confirms transfer".to_string());
+        let before = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        context("registry.testnet", 5 + WAIT_NS, Some(PromiseResult::Successful(vec![])));
+        assert!(!contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+        let after = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(after.status, before.status);
+        assert_eq!(after.attempt_counter, before.attempt_counter);
+        assert_eq!(contract.fees_available, before.fee_amount);
     }
 }
