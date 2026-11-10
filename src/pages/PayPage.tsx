@@ -298,15 +298,25 @@ export default function PayPage({ id }: { id: string }) {
 
         {chain === 'Paid' && (
           <Card className="receipt-print space-y-4 border-t-4 border-emerald-500">
-            <div className="flex items-center gap-2 text-emerald-700">
-              <CheckCircle2 className="h-6 w-6" aria-hidden />
-              <h2 className="font-display text-xl font-semibold">Payment received</h2>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-emerald-700">
+                <CheckCircle2 className="h-6 w-6" aria-hidden />
+                <h2 className="font-display text-xl font-semibold">Payment received</h2>
+              </div>
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-emerald-700">Verified · Paid</span>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[.14em] text-slate-500">{invoice.schoolName}</p>
+              <p className="mt-1 font-display text-xl font-semibold text-ink">{invoice.studentName}</p>
+              <p className="mt-1 text-xs text-slate-500">{invoice.term} · Invoice {invoice.id.slice(0, 8).toUpperCase()}</p>
             </div>
             <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm">
               <dt className="text-slate-600">Status</dt>
               <dd className="font-medium">Paid</dd>
-              <dt className="text-slate-600">Amount</dt>
-              <dd className="tabular-nums">${formatAmount(invoice.amountBase)}</dd>
+              <dt className="text-slate-600">Amount received</dt>
+              <dd className="font-semibold tabular-nums">${formatAmount(invoice.amountBase)} USDC</dd>
+              <dt className="text-slate-600">Network</dt>
+              <dd>NEAR Testnet</dd>
               {invoice.paidAt && (
                 <>
                   <dt className="text-slate-600">Paid on</dt>
@@ -329,7 +339,14 @@ export default function PayPage({ id }: { id: string }) {
                   <span>Recorded on the network (invoice {shortHash(invoice.id)})</span>
                 )}
               </dd>
+              {invoice.settlementTx && (
+                <>
+                  <dt className="text-slate-600">Settlement</dt>
+                  <dd className="break-all"><a className="inline-flex items-center gap-1 text-brand-700 underline" href={txUrl(config, invoice.settlementTx)} target="_blank" rel="noopener noreferrer">{shortHash(invoice.settlementTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden /></a></dd>
+                </>
+              )}
             </dl>
+            <p className="text-xs leading-5 text-slate-500">Keep this receipt for your records. Both payment and settlement references can be checked on the NEAR explorer.</p>
             <Button variant="secondary" className="no-print w-full" onClick={() => window.print()}>
               <Printer className="h-4 w-4" aria-hidden /> Print receipt
             </Button>
