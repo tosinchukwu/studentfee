@@ -2053,6 +2053,33 @@ mod tests {
     }
 
     #[test]
+    fn public_views_serialize_large_amounts_and_timestamps_as_decimal_strings() {
+        let (mut contract, _, _) = funded_contract();
+        let school = near_sdk::serde_json::to_value(contract.get_school(SCHOOL_ID.to_string()).unwrap()).unwrap();
+        assert!(school["storage_balance"].is_string());
+        assert!(school["created_at"].is_string());
+
+        let invoice = near_sdk::serde_json::to_value(contract.get_invoice(INVOICE_ID.to_string()).unwrap()).unwrap();
+        assert!(invoice["amount"].is_string());
+        assert!(invoice["due_date"].is_string());
+        assert!(invoice["paid_at"].is_string());
+        assert!(invoice["fee_amount"].is_string());
+
+        let accounting = near_sdk::serde_json::to_value(contract.get_accounting()).unwrap();
+        assert!(accounting["held"].is_string());
+        assert!(accounting["max_liability"].is_string());
+
+        contract.fees_available = FEE;
+        contract.platform_treasury = Some(account("platform-treasury.testnet"));
+        contract.platform_treasury_verified = true;
+        context("owner.testnet", 4, None);
+        let _withdrawal = contract.withdraw_fees(U128(FEE));
+        let withdrawal = near_sdk::serde_json::to_value(contract.get_withdrawal(0).unwrap()).unwrap();
+        assert!(withdrawal["amount"].is_string());
+        assert!(withdrawal["started_at"].is_string());
+    }
+
+    #[test]
     fn pagination_handles_u64_max_without_index_wraparound() {
         let (contract, _, _) = funded_contract();
         assert!(contract.get_schools(u64::MAX, 100).is_empty());
