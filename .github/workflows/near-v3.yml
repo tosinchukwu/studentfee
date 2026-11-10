@@ -6,11 +6,6 @@ on:
     paths:
       - "contracts/near-v3/**"
       - ".github/workflows/near-v3.yml"
-  push:
-    branches: ["feat/near-multischool-v3-contract"]
-    paths:
-      - "contracts/near-v3/**"
-      - ".github/workflows/near-v3.yml"
   workflow_dispatch:
 
 permissions:
@@ -53,14 +48,14 @@ jobs:
           if-no-files-found: error
       - name: Commit resolved Cargo.lock on the feature branch
         id: lockfile
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/near-multischool-v3-contract'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           git add contracts/near-v3/Cargo.lock
           if ! git diff --cached --quiet -- contracts/near-v3/Cargo.lock; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "chore: update NEAR v3 dependency lockfile"
-            git push origin HEAD:refs/heads/feat/near-multischool-v3-contract
+            git push origin HEAD:refs/heads/${{ github.head_ref }}
             echo "committed=true" >> "$GITHUB_OUTPUT"
           else
             echo "committed=false" >> "$GITHUB_OUTPUT"
@@ -72,7 +67,7 @@ jobs:
         working-directory: contracts/near-v3
         run: |
           find target/near -type f \( -name '*.wasm' -o -name '*abi.json' \) -print
-          find target/near -type f -name '*.wasm' -exec sha256sum {} \\;
+          find target/near -type f -name '*.wasm' -exec sha256sum {} \;
       - name: Upload optimized WebAssembly and ABI
         uses: actions/upload-artifact@v4
         with:
@@ -85,4 +80,4 @@ jobs:
         if: steps.lockfile.outputs.committed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run near-v3.yml --ref feat/near-multischool-v3-contract
+        run: gh workflow run near-v3.yml --ref "${{ github.head_ref || github.ref_name }}"
