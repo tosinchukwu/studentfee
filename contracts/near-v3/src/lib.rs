@@ -539,20 +539,23 @@ impl Contract {
         require!(!school.reactivation_pending, "School reactivation is already pending");
         school.reactivation_pending = true;
         school.reactivation_started_at = Some(env::block_timestamp());
+        school.reactivation_nonce = school.reactivation_nonce.checked_add(1).expect("Reactivation nonce overflow");
+        let nonce = school.reactivation_nonce;
         let treasury = school.treasury.clone();
         self.schools.insert(&school_id, &school);
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
             .storage_balance_of(treasury)
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
-                .on_reactivate_school_check(school_id))
+                .on_reactivate_school_check(school_id, treasury, nonce))
     }
 
     #[private]
-    pub fn on_reactivate_school_check(&mut self, school_id: String) -> bool {
+    pub fn on_reactivate_school_check(&mut self, school_id: String, expected_treasury: AccountId, nonce: u64) -> bool {
         let registered = Self::storage_balance_result();
         if let Some(mut school) = self.schools.get(&school_id) {
-            if school.status != SchoolStatus::Suspended || !school.reactivation_pending { return false; }
+            if school.status != SchoolStatus::Suspended || !school.reactivation_pending
+                || school.reactivation_nonce != nonce || school.treasury != expected_treasury { return false; }
             school.reactivation_pending = false;
             school.reactivation_started_at = None;
             if !registered {
@@ -574,6 +577,7 @@ impl Contract {
         require!(env::block_timestamp() >= started.saturating_add(WAIT_NS), "Reactivation cancellation delay has not elapsed");
         school.reactivation_pending = false;
         school.reactivation_started_at = None;
+        school.reactivation_nonce = school.reactivation_nonce.checked_add(1).expect("Reactivation nonce overflow");
         self.schools.insert(&school_id, &school);
     }
 
