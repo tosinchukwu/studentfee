@@ -1215,6 +1215,42 @@ mod tests {
     }
 
     #[test]
+    fn failed_storage_withdrawal_restores_once_and_ignores_replay() {
+        let (mut contract, _, _) = funded_contract();
+        let amount = 250_000_000_000_000_000_000_000u128;
+        let before = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance;
+        context("school.testnet", 4, None);
+        let _promise = contract.withdraw_storage(SCHOOL_ID.to_string(), U128(amount));
+        let after_start = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance;
+        assert_eq!(after_start, before - amount);
+        assert_eq!(contract.prepaid_storage_total, after_start);
+
+        context("registry.testnet", 5, Some(PromiseResult::Failed));
+        assert!(contract.on_storage_withdrawal_complete(0));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance, before);
+        assert_eq!(contract.prepaid_storage_total, before);
+
+        context("registry.testnet", 6, Some(PromiseResult::Successful(vec![])));
+        assert!(!contract.on_storage_withdrawal_complete(0));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance, before);
+        assert_eq!(contract.prepaid_storage_total, before);
+    }
+
+    #[test]
+    fn pending_school_cannot_transfer_administration() {
+        let (mut contract, _, _) = funded_contract();
+        let mut school = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        school.status = SchoolStatus::PendingApproval;
+        contract.schools.insert(&SCHOOL_ID.to_string(), &school);
+        context("school.testnet", 4, None);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.propose_admin(SCHOOL_ID.to_string(), account("replacement-admin.testnet"));
+        }));
+        assert!(result.is_err());
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().proposed_admin, None);
+    }
+
+    #[test]
     fn only_one_treasury_change_can_be_pending_at_a_time() {
         let (mut contract, _, _) = funded_contract();
         context("school.testnet", 4, None);
