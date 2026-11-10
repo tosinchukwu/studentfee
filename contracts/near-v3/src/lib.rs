@@ -1394,6 +1394,10 @@ mod tests {
         }));
         assert!(result.is_err());
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().proposed_admin, None);
+        let withdrawal = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.withdraw_storage(SCHOOL_ID.to_string(), U128(1));
+        }));
+        assert!(withdrawal.is_err());
     }
 
     #[test]
