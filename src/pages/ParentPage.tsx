@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ArrowRight, BookOpen, ExternalLink, Plus, ReceiptText, ShieldCheck, Trash2 } from 'lucide-react'
+import { ArrowRight, BookOpen, ExternalLink, Plus, ReceiptText, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 import { api } from '../lib/api'
 import { formatDate } from '../lib/format'
 import { formatAmount } from '../lib/money'
@@ -14,8 +14,11 @@ export default function ParentPage() {
   const [value, setValue] = useState('')
   const [ids, setIds] = useState<string[]>([])
   const [invoices, setInvoices] = useState<InvoiceView[]>([])
+  const [failedIds, setFailedIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshToken, setRefreshToken] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -27,15 +30,31 @@ export default function ParentPage() {
 
   useEffect(() => {
     let active = true
-    if (!ids.length) { setInvoices([]); setLoading(false); return }
+    if (!ids.length) {
+      setInvoices([])
+      setFailedIds([])
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
     setLoading(true)
-    Promise.all(ids.map((id) => api.invoice(id).catch(() => null)))
-      .then((items) => {
-        if (active) setInvoices(items.filter((item): item is InvoiceView => item !== null))
+    Promise.all(ids.map(async (id) => {
+      try { return { id, invoice: await api.invoice(id) } }
+      catch { return { id, invoice: null } }
+    }))
+      .then((results) => {
+        if (!active) return
+        setInvoices(results.flatMap((item) => item.invoice ? [item.invoice] : []))
+        setFailedIds(results.filter((item) => item.invoice === null).map((item) => item.id))
       })
-      .finally(() => active && setLoading(false))
+      .finally(() => {
+        if (active) {
+          setLoading(false)
+          setRefreshing(false)
+        }
+      })
     return () => { active = false }
-  }, [ids])
+  }, [ids, refreshToken])
 
   const addInvoice = async (event: FormEvent) => {
     event.preventDefault()
@@ -47,6 +66,7 @@ export default function ParentPage() {
       const next = [id, ...ids.filter((item) => item !== id)].slice(0, 10)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
       setInvoices((current) => [invoice, ...current.filter((item) => item.id !== id)])
+      setFailedIds((current) => current.filter((item) => item !== id))
       setIds(next); setValue('')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'We could not find that invoice. Check the link and try again.')
@@ -58,8 +78,13 @@ export default function ParentPage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
     setIds(next)
     setInvoices((items) => items.filter((item) => item.id !== id))
+    setFailedIds((items) => items.filter((item) => item !== id))
   }
 
+  const refresh = () => {
+    setRefreshing(true)
+    setRefreshToken((value) => value + 1)
+  }
   const outstanding = invoices.filter((item) => item.status === 'Pending' || item.status === 'Overdue' || item.status === 'Processing')
   return (
     <PageShell schoolName="Parent fee hub">
@@ -88,7 +113,11 @@ export default function ParentPage() {
         </Card>
 
         <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3"><div><h2 className="font-display text-xl font-semibold text-ink">Your invoices</h2><p className="text-sm text-slate-500">Latest status retrieved from the StudentFee service</p></div><ReceiptText className="h-5 w-5 text-slate-400" /></div>
+          <div className="flex items-center justify-between gap-3">
+            <div><h2 className="font-display text-xl font-semibold text-ink">Your invoices</h2><p className="text-sm text-slate-500">Latest status retrieved from the StudentFee service</p></div>
+            <Button variant="secondary" className="!min-h-[40px]" busy={refreshing || loading} disabled={loading || refreshing || ids.length === 0} onClick={refresh}><RefreshCw className="h-4 w-4" /> Refresh</Button>
+          </div>
+          {failedIds.length > 0 && <Notice tone="warn">{failedIds.length} saved invoice{failedIds.length === 1 ? '' : 's'} could not be refreshed. Check your connection and try Refresh; your saved links have not been deleted.</Notice>}
           {loading ? <Card><Spinner label="Loading saved invoices" /></Card> : invoices.length ? (
             <div className="space-y-3">{invoices.map((invoice) => (
               <Card key={invoice.id} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
