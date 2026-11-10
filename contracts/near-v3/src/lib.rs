@@ -1536,10 +1536,14 @@ mod tests {
         }));
         assert!(reuse_paid.is_err());
 
-        let _refund = contract.refund_payment(NEW_ID.to_string());
-        context("registry.testnet", 8, Some(PromiseResult::Successful(vec![])));
-        assert!(contract.on_transfer_complete(NEW_ID.to_string(), 1, OperationType::Refund));
+        context("usdc.testnet", 8, None);
+        let accepted = contract.ft_on_transfer(account("parent-two.testnet"), U128(GROSS), NEW_ID.to_string());
+        assert!(matches!(accepted, PromiseOrValue::Value(value) if value.0 == 0));
         context("school.testnet", 9, None);
+        let _refund = contract.refund_payment(NEW_ID.to_string());
+        context("registry.testnet", 10, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(NEW_ID.to_string(), 1, OperationType::Refund));
+        context("school.testnet", 11, None);
         let reuse_refunded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             contract.create_invoice(SCHOOL_ID.to_string(), NEW_ID.to_string(), U128(GROSS), 0);
         }));
