@@ -23,6 +23,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0
       - name: Install current stable Rust
         uses: dtolnay/rust-toolchain@master
         with:
