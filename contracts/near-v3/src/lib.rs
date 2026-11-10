@@ -1557,9 +1557,9 @@ mod tests {
         assert!(accept_owner.is_err());
         assert_eq!(contract.owner, account("owner.testnet"));
 
+        contract.treasury_index.remove(&candidate);
         context("school.testnet", 6, None);
         contract.propose_admin(SCHOOL_ID.to_string(), candidate.clone());
-        contract.treasury_index.remove(&candidate);
         contract.platform_treasury = Some(candidate.clone());
         contract.platform_treasury_verified = true;
         context("role-candidate.testnet", 7, None);
