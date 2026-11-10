@@ -231,6 +231,7 @@ trait ExtSelf {
     fn on_platform_treasury_check(&mut self, account_id: AccountId) -> bool;
     fn on_transfer_complete(&mut self, invoice_id: String, attempt_id: u64, operation: OperationType) -> bool;
     fn on_fee_withdrawal_complete(&mut self, withdrawal_id: u64) -> bool;
+    fn on_storage_withdrawal_complete(&mut self, school_id: String, amount: U128) -> bool;
 }
 
 #[near(contract_state)]
@@ -329,8 +330,10 @@ impl Contract {
     pub fn on_school_treasury_check(&mut self, school_id: String, admin: AccountId) -> bool {
         let registered = Self::storage_balance_result();
         if !registered {
-            self.schools.remove(&school_id);
-            self.admin_index.remove(&admin);
+            if let Some(school) = self.schools.remove(&school_id) {
+                self.admin_index.remove(&admin);
+                Promise::new(admin).transfer(NearToken::from_yoctonear(school.storage_balance));
+            }
             env::log_str("SCHOOL_REGISTRATION_REJECTED_TREASURY_NOT_REGISTERED");
             return false;
         }
@@ -379,12 +382,34 @@ impl Contract {
         self.schools.insert(&school_id, &school);
     }
 
-    pub fn reactivate_school(&mut self, school_id: String) {
+    pub fn reactivate_school(&mut self, school_id: String) -> Promise {
         self.assert_owner();
-        let mut school = self.schools.get(&school_id).expect("School not found");
+        let school = self.schools.get(&school_id).expect("School not found");
         require!(school.status == SchoolStatus::Suspended, "School is not suspended");
-        require!(school.treasury_verified, "Treasury is not verified");
-        school.status = SchoolStatus::Active;
+        ext_ft::ext(self.usdc_token.clone())
+            .with_static_gas(FT_GAS)
+            .storage_balance_of(school.treasury)
+            .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
+                .on_reactivate_school_check(school_id))
+    }
+
+    #[private]
+    pub fn on_reactivate_school_check(&mut self, school_id: String) -> bool {
+        if !Self::storage_balance_result() { return false; }
+        if let Some(mut school) = self.schools.get(&school_id) {
+            if school.status != SchoolStatus::Suspended { return false; }
+            school.treasury_verified = true;
+            school.status = SchoolStatus::Active;
+            self.schools.insert(&school_id, &school);
+            true
+        } else { false }
+    }
+
+    pub fn set_school_fee(&mut self, school_id: String, fee_bps: u16) {
+        self.assert_owner();
+        require!(fee_bps <= MAX_FEE_BPS, "Platform fee exceeds 5%");
+        let mut school = self.schools.get(&school_id).expect("School not found");
+        school.fee_bps = fee_bps;
         self.schools.insert(&school_id, &school);
     }
 
@@ -438,9 +463,6 @@ impl Contract {
     pub fn on_queue_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool {
         if !Self::storage_balance_result() { return false; }
         if let Some(mut school) = self.schools.get(&school_id) {
-            if school.admin != env::predecessor_account_id() && env::predecessor_account_id() != env::current_account_id() {
-                // Callback is private; the original caller is recorded by NEAR promise context only through arguments.
-            }
             school.queued_treasury = Some(new_treasury);
             school.treasury_effective_at = Some(env::block_timestamp().saturating_add(TREASURY_DELAY_NS));
             self.schools.insert(&school_id, &school);
@@ -491,6 +513,19 @@ impl Contract {
         let admin = school.admin.clone();
         self.schools.insert(&school_id, &school);
         Promise::new(admin).transfer(NearToken::from_yoctonear(amount.0))
+            .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
+                .on_storage_withdrawal_complete(school_id, amount))
+    }
+
+    #[private]
+    pub fn on_storage_withdrawal_complete(&mut self, school_id: String, amount: U128) -> bool {
+        if matches!(env::promise_result(0), PromiseResult::Successful(_)) { return true; }
+        if let Some(mut school) = self.schools.get(&school_id) {
+            school.storage_balance = school.storage_balance.checked_add(amount.0).expect("Storage balance overflow");
+            self.schools.insert(&school_id, &school);
+            return true;
+        }
+        false
     }
 
     // ----- Invoice creation and payment acceptance -----
