@@ -31,6 +31,7 @@ enum StorageKey {
     UsedInvoiceIds,
     AdminIndex,
     Withdrawals,
+    SchoolInvoiceIds,
 }
 
 #[near(serializers = [json, borsh])]
@@ -249,7 +250,8 @@ pub struct Contract {
     schools: UnorderedMap<String, School>,
     invoices: UnorderedMap<String, Invoice>,
     used_invoice_ids: UnorderedSet<String>,
-    admin_index: LookupMap<AccountId, String>,\n    school_invoice_ids: LookupMap<String, Vector<String>>,
+    admin_index: LookupMap<AccountId, String>,
+    school_invoice_ids: LookupMap<String, Vector<String>>,
     withdrawals: UnorderedMap<u64, Withdrawal>,
     held: u128,                 // H
     settling_gross: u128,       // SI
@@ -278,7 +280,8 @@ impl Contract {
             schools: UnorderedMap::new(StorageKey::Schools),
             invoices: UnorderedMap::new(StorageKey::Invoices),
             used_invoice_ids: UnorderedSet::new(StorageKey::UsedInvoiceIds),
-            admin_index: LookupMap::new(StorageKey::AdminIndex),\n            school_invoice_ids: LookupMap::new(StorageKey::SchoolInvoiceIds),
+            admin_index: LookupMap::new(StorageKey::AdminIndex),
+            school_invoice_ids: LookupMap::new(StorageKey::SchoolInvoiceIds),
             withdrawals: UnorderedMap::new(StorageKey::Withdrawals),
             held: 0,
             settling_gross: 0,
@@ -562,6 +565,9 @@ impl Contract {
         };
         self.invoices.insert(&invoice_id, &invoice);
         self.used_invoice_ids.insert(&invoice_id);
+        let mut ids = self.school_invoice_ids.get(&school_id).unwrap_or_else(|| Vector::new(format!("school-invoices:{}", school_id).into_bytes()));
+        ids.push(&invoice_id);
+        self.school_invoice_ids.insert(&school_id, &ids);
         let bytes = env::storage_usage().saturating_sub(before) as u128;
         let cost = bytes.checked_mul(env::storage_byte_cost().as_yoctonear()).expect("Storage cost overflow");
         require!(school.storage_balance >= cost, "School storage balance is insufficient");
@@ -783,7 +789,16 @@ impl Contract {
 
     pub fn get_school(&self, school_id: String) -> Option<SchoolView> { self.schools.get(&school_id).map(Into::into) }
     pub fn get_invoice(&self, invoice_id: String) -> Option<InvoiceView> { self.invoices.get(&invoice_id).map(Into::into) }
-    pub fn get_school_for_admin(&self, admin: AccountId) -> Option<String> { self.admin_index.get(&admin) }\n    pub fn get_schools(&self, from_index: u64, limit: u64) -> Vec<SchoolView> {\n        self.schools.iter().skip(from_index as usize).take(limit.min(100) as usize).map(|(_, school)| school.into()).collect()\n    }\n    pub fn get_school_invoice_ids(&self, school_id: String, from_index: u64, limit: u64) -> Vec<String> {\n        self.school_invoice_ids.get(&school_id).map(|ids| ids.iter().skip(from_index as usize).take(limit.min(100) as usize).collect()).unwrap_or_default()\n    }\n    pub fn get_school_invoices(&self, school_id: String, from_index: u64, limit: u64) -> Vec<InvoiceView> {\n        self.get_school_invoice_ids(school_id, from_index, limit).into_iter().filter_map(|id| self.invoices.get(&id).map(Into::into)).collect()\n    }
+    pub fn get_school_for_admin(&self, admin: AccountId) -> Option<String> { self.admin_index.get(&admin) }
+    pub fn get_schools(&self, from_index: u64, limit: u64) -> Vec<SchoolView> {
+        self.schools.iter().skip(from_index as usize).take(limit.min(100) as usize).map(|(_, school)| school.into()).collect()
+    }
+    pub fn get_school_invoice_ids(&self, school_id: String, from_index: u64, limit: u64) -> Vec<String> {
+        self.school_invoice_ids.get(&school_id).map(|ids| ids.iter().skip(from_index as usize).take(limit.min(100) as usize).collect()).unwrap_or_default()
+    }
+    pub fn get_school_invoices(&self, school_id: String, from_index: u64, limit: u64) -> Vec<InvoiceView> {
+        self.get_school_invoice_ids(school_id, from_index, limit).into_iter().filter_map(|id| self.invoices.get(&id).map(Into::into)).collect()
+    }
     pub fn get_accounting(&self) -> Accounting {
         let min_liability = self.held + self.settling_fee + self.fees_available;
         let max_liability = self.held + self.settling_gross + self.refunding_gross + self.fees_available + self.fees_in_flight;
@@ -944,6 +959,7 @@ impl Contract {
 
 #[near]
 impl FungibleTokenReceiver for Contract {
+    #[payable]
     fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
         if env::predecessor_account_id() != self.usdc_token {
             return PromiseOrValue::Value(amount);
