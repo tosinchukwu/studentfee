@@ -297,7 +297,7 @@ export default function PayPage({ id }: { id: string }) {
         </Card>
 
         {chain === 'Paid' && (
-          <Card className="space-y-4 border-t-4 border-emerald-500">
+          <Card className="receipt-print space-y-4 border-t-4 border-emerald-500">
             <div className="flex items-center gap-2 text-emerald-700">
               <CheckCircle2 className="h-6 w-6" aria-hidden />
               <h2 className="font-display text-xl font-semibold">Payment received</h2>
