@@ -446,3 +446,64 @@ USDC integration: same token. The v3 registry account is registered with USDC on
 2. Your approval of this complete specification. After that, your NEAR developer implements and deploys v3 to a new testnet account, and I review it against this document before touching the application. `v2.studentfee.testnet` stays untouched.
 
 Mainnet: not configured here. Every limit above is a testnet value and must be reviewed before any mainnet use.
+
+
+## 17. Product modes and version selection (new requirement)
+
+The product must support two clearly separated operating modes. This is an application-level choice, not a migration or replacement of the deployed v2 contract.
+
+### 17.1 Standard single-school mode (existing product)
+
+- This remains the default, fully supported StudentFee experience and stays available throughout v3 development and after v3 deployment.
+- It continues to use the deployed `v2.studentfee.testnet` contract and its existing single-school administrator/treasury configuration.
+- Existing v2 invoices, payment links, receipts, parent records, and history remain readable and actionable through the v2 adapter.
+- No existing v2 invoice is silently copied, re-created, re-priced, or migrated to v3.
+- If a school chooses Standard mode, the application must not require a v3 school registration or v3 contract account.
+
+### 17.2 Multi-school mode (new v3 product)
+
+- Multi-school mode is an optional, separately selected experience for a platform operator or school onboarding flow.
+- It becomes selectable only after the v3 contract is deployed to a new account, its USDC registration and treasury setup are verified, the v3 adapter is integrated, and the full testnet acceptance suite passes.
+- Each approved school has its own immutable `school_id`, administrator, treasury, storage balance, fee snapshot policy, and scoped invoices.
+- School administrators must only see and operate on their own school's records. The backend derives school identity from the verified signed-in account/session; it must never trust a client-supplied `school_id`.
+- Platform owner functions and school administrator functions must remain separate. A school administrator is not the platform owner.
+- New v3 invoices are created only under an active, approved school. Parent payment links resolve their contract version from the invoice record, not from a user-selected version toggle.
+
+### 17.3 Version choice and navigation
+
+- Add a product-mode choice to the landing/onboarding experience with plain labels such as **Standard school workspace** and **Multi-school platform**. Explain briefly that Standard is the existing single-school system and Multi-school is the new school-registration and multi-tenant system.
+- Standard remains the default/primary path. Do not force existing users to choose again or disrupt the current route.
+- If v3 is not configured or its deployment/health checks fail, hide or disable the Multi-school choice with an honest "coming soon" or "not yet available" explanation. Never route a user to a non-existent contract.
+- Persist a selected mode only as a navigation/onboarding preference. It is not authorization. Every API request and contract operation must still enforce the signed-in account's permissions and school scope.
+- Provide a clear way to return to Standard mode. The two modes may share branding and common UI components, but must not share unscoped data, session assumptions, or contract method calls.
+- Parent payment and receipt routes must be version-transparent: an existing v2 invoice always uses v2; a v3 invoice always uses v3. Parents must not need to understand contract versions.
+
+### 17.4 Version-aware application architecture
+
+- Keep one adapter per deployed contract version. Resolve an invoice to its adapter by the persisted `contract_id` and version. Never infer the contract from the current global default.
+- Keep `NEW_INVOICE_VERSION` explicit and configuration-gated. Until v3 is verified, it remains `v2`; do not switch new invoice creation merely because v3 source code exists or a contract has been deployed.
+- Preserve v2's six-status lifecycle and existing refund semantics in the v2 adapter and UI. Implement v3's nine statuses and recovery controls only in the v3 adapter and v3-aware views.
+- Store `contract_id`, `contract_version`, and (for v3) `school_id` on invoice records. Backfill existing records to the known v2 contract and legacy single-school scope without changing on-chain data.
+- Apply tenant scoping to every list, read, export, mutation, background job, and server-side lookup. Add negative tests proving that school A cannot read or mutate school B's invoices by changing an ID or request parameter.
+- Do not let the mode selector change wallet network, USDC token, contract account, treasury, or production environment variables by itself. Those values come from validated server configuration and the invoice's registered contract adapter.
+
+### 17.5 Release and rollback gates
+
+1. Finish and verify the existing Standard/v2 application first. Keep its production route and contract untouched.
+2. Implement the v3 contract in a separate source directory/package and deploy it only to a new testnet account. Do not overwrite or redeploy `v2.studentfee.testnet`.
+3. Verify owner identity, school approval, USDC storage registration, fee treasury setup, treasury delay, every lifecycle transition, recovery accounting invariants, and all required adversarial tests before application integration.
+4. Integrate v3 behind a disabled feature flag. Run contract-level tests, API authorization tests, cross-school isolation tests, parent-link routing tests, and end-to-end testnet payment/refund/settlement tests.
+5. Enable the Multi-school choice only after all gates pass. Keep Standard/v2 available as the default and rollback path.
+6. Any v3 failure must disable new v3 onboarding/invoice creation without disabling reads or payment completion for existing v2 invoices. Do not switch an invoice between contracts after creation.
+
+### 17.6 Explicit non-goals
+
+- No automatic conversion of a Standard school into a Multi-school tenant.
+- No cross-contract transfer of existing invoice funds or payment history.
+- No global parent account requirement for v2.
+- No assumption that a deployed v3 contract is safe merely because it compiles.
+- No mainnet deployment or mainnet fee/limit configuration is authorized by this specification.
+
+### 17.7 Approval and deployment sequence
+
+This section records the product requirement; it does not authorize deployment. Before v3 deployment, the owner must approve the complete contract specification, supply/confirm the dedicated platform fee treasury account, verify the owner account by signed message, and confirm the new testnet account ID and deployment arguments. The generated v3 contract source and tests must be reviewed against this document before any deployment. The deployed v2 contract remains untouched.
