@@ -1190,6 +1190,20 @@ mod tests {
     }
 
     #[test]
+    fn only_one_treasury_change_can_be_pending_at_a_time() {
+        let (mut contract, _, _) = funded_contract();
+        context("school.testnet", 4, None);
+        let _first = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        let second = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.queue_treasury_change(SCHOOL_ID.to_string(), account("another-treasury.testnet"));
+        }));
+        assert!(second.is_err());
+        let school = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        assert_eq!(school.queued_treasury, Some(account("new-treasury.testnet")));
+        assert_eq!(school.treasury_effective_at, None);
+    }
+
+    #[test]
     fn low_free_near_reserve_rejects_transfer_before_ledger_changes() {
         let (mut contract, _, _) = funded_contract();
         let mut builder = VMContextBuilder::new();
