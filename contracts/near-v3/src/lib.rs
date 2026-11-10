@@ -309,8 +309,10 @@ impl Contract {
     pub fn register_school(&mut self, name: String, description: String, treasury: AccountId) -> Promise {
         self.ensure_free_near_reserve();
         let admin = env::predecessor_account_id();
-        require!(admin != self.owner, "Owner cannot be a school administrator");
+        require!(admin != self.owner && admin != env::current_account_id(), "Invalid school administrator");
         require!(self.admin_index.get(&admin).is_none(), "Administrator already owns a school");
+        require!(self.treasury_index.get(&admin).is_none(), "A school treasury cannot become an administrator");
+        require!(self.platform_treasury.as_ref() != Some(&admin), "Platform treasury cannot become a school administrator");
         require!(treasury != admin && treasury != self.owner && treasury != env::current_account_id(), "Treasury must be a separate account");
         require!(self.treasury_index.get(&treasury).is_none(), "Treasury is already assigned to a school");
         require!(self.admin_index.get(&treasury).is_none(), "A school administrator cannot be a treasury");
@@ -1130,6 +1132,24 @@ mod tests {
         assert!(platform_treasury.is_err());
         assert_eq!(contract.owner, account("owner.testnet"));
         assert_eq!(contract.proposed_owner, None);
+    }
+
+    #[test]
+    fn treasury_accounts_cannot_register_as_school_administrators() {
+        let (mut contract, _, _) = funded_contract();
+        context("treasury.testnet", 4, None);
+        let school_treasury = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.register_school("Impostor School".to_string(), "".to_string(), account("new-treasury.testnet"));
+        }));
+        assert!(school_treasury.is_err());
+
+        contract.platform_treasury = Some(account("platform-treasury.testnet"));
+        context("platform-treasury.testnet", 5, None);
+        let platform_treasury = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.register_school("Impostor School".to_string(), "".to_string(), account("new-treasury.testnet"));
+        }));
+        assert!(platform_treasury.is_err());
+        assert_eq!(contract.schools.len(), 1);
     }
 
     #[test]
