@@ -1539,7 +1539,9 @@ mod tests {
         context("usdc.testnet", 8, None);
         let accepted = contract.ft_on_transfer(account("parent-two.testnet"), U128(GROSS), NEW_ID.to_string());
         assert!(matches!(accepted, PromiseOrValue::Value(value) if value.0 == 0));
+        assert_eq!(contract.invoices.get(&NEW_ID.to_string()).unwrap().status, InvoiceStatus::PaymentReceived);
         context("school.testnet", 9, None);
+        assert_eq!(contract.invoices.get(&NEW_ID.to_string()).unwrap().status, InvoiceStatus::PaymentReceived);
         let _refund = contract.refund_payment(NEW_ID.to_string());
         context("registry.testnet", 10, Some(PromiseResult::Successful(vec![])));
         assert!(contract.on_transfer_complete(NEW_ID.to_string(), 1, OperationType::Refund));
