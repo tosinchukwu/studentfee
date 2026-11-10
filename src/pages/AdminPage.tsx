@@ -196,6 +196,22 @@ export default function AdminPage() {
     { label: 'Processing', count: counts.Processing ?? 0, color: 'bg-amber-500' },
     { label: 'Overdue', count: counts.Overdue ?? 0, color: 'bg-rose-500' },
   ]
+  const monthlyCollections = useMemo(() => {
+    const now = new Date()
+    const months = Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
+      return { key: `${date.getFullYear()}-${date.getMonth()}`, label: date.toLocaleDateString('en', { month: 'short' }), amount: 0n, count: 0 }
+    })
+    for (const invoice of invoices ?? []) {
+      if (invoice.status !== 'Paid' || !invoice.paidAt) continue
+      const date = new Date(invoice.paidAt)
+      const bucket = months.find((month) => month.key === `${date.getFullYear()}-${date.getMonth()}`)
+      if (bucket) { bucket.amount += BigInt(invoice.amountBase); bucket.count += 1 }
+    }
+    return months
+  }, [invoices])
+  const maxMonthly = monthlyCollections.reduce((max, month) => month.amount > max ? month.amount : max, 0n)
+
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return (invoices ?? []).filter(
@@ -384,6 +400,29 @@ export default function AdminPage() {
             ) : <p className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">Your latest invoices will appear here.</p>}
           </Card>
         </div>
+
+        <Card id="analytics-chart" className="space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><p className="font-display text-lg font-semibold text-ink">Collection trend</p><p className="mt-1 text-xs text-slate-500">Confirmed paid invoices · last six months</p></div>
+            <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-semibold text-brand-800">USDC · on-chain paid</span>
+          </div>
+          <div className="grid grid-cols-6 gap-2 sm:gap-4">
+            {monthlyCollections.map((month) => {
+              const height = maxMonthly > 0n ? Math.max(5, Number((month.amount * 100n) / maxMonthly)) : 0
+              return (
+                <div key={month.key} className="flex min-w-0 flex-col items-center gap-2">
+                  <span className="text-[10px] font-semibold tabular-nums text-slate-500 sm:text-xs">{month.count}</span>
+                  <div className="flex h-28 w-full items-end justify-center rounded-xl bg-slate-50 p-1.5 sm:h-36">
+                    <div className="w-full max-w-10 rounded-t-lg bg-gradient-to-t from-[#0f665f] to-[#35b8a7] transition-all" style={{ height: `${height}%`, minHeight: month.amount > 0n ? '6px' : '0' }} title={`${formatAmount(month.amount)} · ${month.count} paid invoices`} />
+                  </div>
+                  <span className="text-xs font-medium text-slate-500">{month.label}</span>
+                  <span className="max-w-full truncate text-[10px] tabular-nums text-slate-400 sm:text-xs">${formatAmount(month.amount)}</span>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-slate-500">Only invoices marked Paid by the deployed contract are counted. This chart is based on the invoice history currently available to this school account.</p>
+        </Card>
 
         {created && (
           <Notice tone="info">
