@@ -31,4 +31,4 @@ jobs:
         with:
           workspaces: contracts/near-v3
       - name: Run v3 contract tests
-        run: cargo test --manifest-path contracts/near-v3/Cargo.toml --locked
+        run: cargo test --manifest-path contracts/near-v3/Cargo.toml
