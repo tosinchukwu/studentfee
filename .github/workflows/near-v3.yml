@@ -51,11 +51,11 @@ jobs:
         id: lockfile
         if: github.event_name == 'push' && github.ref == 'refs/heads/feat/near-multischool-v3-contract'
         run: |
-          if ! git ls-files --error-unmatch contracts/near-v3/Cargo.lock >/dev/null 2>&1; then
+          git add contracts/near-v3/Cargo.lock
+          if ! git diff --cached --quiet -- contracts/near-v3/Cargo.lock; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add contracts/near-v3/Cargo.lock
-            git commit -m "chore: lock NEAR v3 dependencies"
+            git commit -m "chore: update NEAR v3 dependency lockfile"
             git push origin HEAD:refs/heads/feat/near-multischool-v3-contract
             echo "committed=true" >> "$GITHUB_OUTPUT"
           else
