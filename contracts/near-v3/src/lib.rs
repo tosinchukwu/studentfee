@@ -955,10 +955,12 @@ impl Contract {
     pub fn get_invoice(&self, invoice_id: String) -> Option<InvoiceView> { self.invoices.get(&invoice_id).map(Into::into) }
     pub fn get_school_for_admin(&self, admin: AccountId) -> Option<String> { self.admin_index.get(&admin) }
     pub fn get_schools(&self, from_index: u64, limit: u64) -> Vec<SchoolView> {
-        self.schools.iter().skip(from_index as usize).take(limit.min(100) as usize).map(|(_, school)| school.into()).collect()
+        let start = usize::try_from(from_index).unwrap_or(usize::MAX);
+        self.schools.iter().skip(start).take(limit.min(100) as usize).map(|(_, school)| school.into()).collect()
     }
     pub fn get_school_invoice_ids(&self, school_id: String, from_index: u64, limit: u64) -> Vec<String> {
-        self.school_invoice_ids.get(&school_id).map(|ids| ids.iter().skip(from_index as usize).take(limit.min(100) as usize).collect()).unwrap_or_default()
+        let start = usize::try_from(from_index).unwrap_or(usize::MAX);
+        self.school_invoice_ids.get(&school_id).map(|ids| ids.iter().skip(start).take(limit.min(100) as usize).collect()).unwrap_or_default()
     }
     pub fn get_school_invoices(&self, school_id: String, from_index: u64, limit: u64) -> Vec<InvoiceView> {
         self.get_school_invoice_ids(school_id, from_index, limit).into_iter().filter_map(|id| self.invoices.get(&id).map(Into::into)).collect()
@@ -1871,6 +1873,14 @@ mod tests {
         assert_eq!(MAX_INVOICE, 1_000_000_000);
         assert_eq!(MAX_AT_RISK, 5_000_000_000);
         assert_eq!(MAX_LIFETIME_COLLATERAL, 1_000_000_000);
+    }
+
+    #[test]
+    fn pagination_handles_u64_max_without_index_wraparound() {
+        let (contract, _, _) = funded_contract();
+        assert!(contract.get_schools(u64::MAX, 100).is_empty());
+        assert!(contract.get_school_invoice_ids(SCHOOL_ID.to_string(), u64::MAX, 100).is_empty());
+        assert!(contract.get_school_invoices(SCHOOL_ID.to_string(), u64::MAX, 100).is_empty());
     }
 
     #[test]
