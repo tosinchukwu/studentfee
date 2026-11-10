@@ -2837,4 +2837,60 @@ mod tests {
         contract.queue_treasury_change(SCHOOL_ID.to_string(), account("pending-platform.testnet"));
     }
 
+
+
+    #[test]
+    fn randomized_500_step_attempt_counter_is_strictly_monotonic_and_callbacks_are_single_use() {
+        let (mut contract, _, _) = funded_contract();
+        let mut seed: u64 = 0x5eed_cafe_d00d_beef;
+        let mut previous = 0u64;
+        let mut seen = std::collections::BTreeSet::new();
+
+        // A deterministic xorshift sequence keeps this regression reproducible in CI.
+        for step in 0..500u64 {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            let operation = if seed & 1 == 0 { OperationType::Settle } else { OperationType::Refund };
+
+            context("school.testnet", 10 + step * 3, None);
+            match operation {
+                OperationType::Settle => { let _ = contract.settle_invoice(INVOICE_ID.to_string()); }
+                OperationType::Refund => { let _ = contract.refund_payment(INVOICE_ID.to_string()); }
+            }
+
+            let in_flight = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+            let attempt_id = in_flight.active_attempt_id.expect("start must assign an active attempt");
+            assert_eq!(attempt_id, previous + 1, "attempt id must increase exactly once at step {step}");
+            assert!(seen.insert(attempt_id), "attempt id must never repeat");
+            assert_eq!(in_flight.attempt_counter, attempt_id);
+            assert_eq!(in_flight.operation_type, Some(operation));
+            assert_ledger_invariants(&contract);
+
+            // A confirmed failed transfer returns the invoice to PaymentReceived,
+            // allowing the next randomized operation to start with a fresh attempt.
+            context("registry.testnet", 11 + step * 3, Some(PromiseResult::Failed));
+            assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), attempt_id, operation));
+            assert_ledger_invariants(&contract);
+
+            // Replaying the same callback must be a no-op and cannot consume an id.
+            let before_replay = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+            let before_counter = before_replay.attempt_counter;
+            let before_status = before_replay.status;
+            assert!(!contract.on_transfer_complete(INVOICE_ID.to_string(), attempt_id, operation));
+            let after_replay = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+            assert_eq!(after_replay.attempt_counter, before_counter);
+            assert_eq!(after_replay.status, before_status);
+            assert_eq!(after_replay.active_attempt_id, None);
+            assert_ledger_invariants(&contract);
+
+            previous = attempt_id;
+        }
+
+        let final_invoice = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(final_invoice.attempt_counter, 500);
+        assert_eq!(seen.len(), 500);
+        assert_eq!(final_invoice.status, InvoiceStatus::PaymentReceived);
+    }
+
 }
