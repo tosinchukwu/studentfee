@@ -73,7 +73,7 @@ pub struct School {
     pub status: SchoolStatus,
     pub treasury_verified: bool,
     pub fee_bps: u16,
-    pub storage_balance: U128,
+    pub storage_balance: u128,
     pub created_at: u64,
     pub queued_treasury: Option<AccountId>,
     pub treasury_effective_at: Option<u64>,
@@ -85,20 +85,20 @@ pub struct School {
 pub struct Invoice {
     pub invoice_id: String,
     pub school_id: String,
-    pub amount: U128,
+    pub amount: u128,
     pub due_date: u64,
     pub status: InvoiceStatus,
     pub fee_bps: u16,
     pub payer: Option<AccountId>,
     pub treasury_snapshot: Option<AccountId>,
-    pub fee_amount: U128,
-    pub net_amount: U128,
+    pub fee_amount: u128,
+    pub net_amount: u128,
     pub paid_at: Option<u64>,
     pub attempt_counter: u64,
     pub active_attempt_id: Option<u64>,
     pub operation_type: Option<OperationType>,
     pub operation_recipient: Option<AccountId>,
-    pub operation_amount: U128,
+    pub operation_amount: u128,
     pub operation_started_at: Option<u64>,
     pub operation_from_recovered: bool,
     pub recovery_count: u8,
@@ -241,7 +241,7 @@ impl Contract {
             status: SchoolStatus::PendingApproval,
             treasury_verified: false,
             fee_bps: DEFAULT_FEE_BPS,
-            storage_balance: U128(env::attached_deposit().as_yoctonear()),
+            storage_balance: env::attached_deposit().as_yoctonear(),
             created_at: env::block_timestamp(),
             queued_treasury: None,
             treasury_effective_at: None,
@@ -411,14 +411,14 @@ impl Contract {
         let mut school = self.get_admin_school(&school_id);
         let amount = env::attached_deposit().as_yoctonear();
         require!(amount > 0, "Attach a storage deposit");
-        school.storage_balance = U128(school.storage_balance.0.checked_add(amount).expect("Storage balance overflow"));
+        school.storage_balance = U128(school.storage_balance.checked_add(amount).expect("Storage balance overflow"));
         self.schools.insert(&school_id, &school);
     }
 
     pub fn withdraw_storage(&mut self, school_id: String, amount: U128) -> Promise {
         let mut school = self.get_admin_school(&school_id);
-        require!(amount.0 > 0 && amount.0 <= school.storage_balance.0, "Insufficient prepaid storage");
-        school.storage_balance = U128(school.storage_balance.0 - amount.0);
+        require!(amount.0 > 0 && amount.0 <= school.storage_balance, "Insufficient prepaid storage");
+        school.storage_balance -= amount.0;
         let admin = school.admin.clone();
         self.schools.insert(&school_id, &school);
         Promise::new(admin).transfer(NearToken::from_yoctonear(amount.0))
@@ -443,14 +443,14 @@ impl Contract {
             fee_bps: school.fee_bps,
             payer: None,
             treasury_snapshot: None,
-            fee_amount: U128(0),
-            net_amount: U128(0),
+            fee_amount: 0,
+            net_amount: 0,
             paid_at: None,
             attempt_counter: 0,
             active_attempt_id: None,
             operation_type: None,
             operation_recipient: None,
-            operation_amount: U128(0),
+            operation_amount: 0,
             operation_started_at: None,
             operation_from_recovered: false,
             recovery_count: 0,
@@ -460,8 +460,8 @@ impl Contract {
         self.used_invoice_ids.insert(&invoice_id);
         let bytes = env::storage_usage().saturating_sub(before) as u128;
         let cost = bytes.checked_mul(env::storage_byte_cost().as_yoctonear()).expect("Storage cost overflow");
-        require!(school.storage_balance.0 >= cost, "School storage balance is insufficient");
-        school.storage_balance = U128(school.storage_balance.0 - cost);
+        require!(school.storage_balance >= cost, "School storage balance is insufficient");
+        school.storage_balance -= cost;
         self.schools.insert(&school_id, &school);
     }
 
@@ -519,20 +519,20 @@ impl Contract {
         require!(invoice.status == InvoiceStatus::Settling || invoice.status == InvoiceStatus::Refunding, "Invoice is not frozen");
         require!(env::block_timestamp() >= invoice.operation_started_at.unwrap_or(0).saturating_add(WAIT_NS), "Recovery delay has not elapsed");
         require!(invoice.recovery_count < MAX_RECOVERIES, "Invoice recovery limit reached");
-        let collateral = if invoice.operation_type == Some(OperationType::Settle) { invoice.net_amount.0 } else { invoice.amount.0 };
+        let collateral = if invoice.operation_type == Some(OperationType::Settle) { invoice.net_amount } else { invoice.amount };
         require!(self.fees_available >= collateral, "Insufficient platform fees for collateral");
         require!(self.lifetime_collateral.checked_add(collateral).unwrap_or(u128::MAX) <= MAX_LIFETIME_COLLATERAL, "Lifetime collateral limit reached");
         match invoice.operation_type.expect("Operation type missing") {
             OperationType::Settle => {
-                self.settling_gross = self.settling_gross.checked_sub(invoice.amount.0).expect("Ledger underflow");
-                self.settling_fee = self.settling_fee.checked_sub(invoice.fee_amount.0).expect("Ledger underflow");
-                self.held = self.held.checked_add(invoice.amount.0).expect("Ledger overflow");
+                self.settling_gross = self.settling_gross.checked_sub(invoice.amount).expect("Ledger underflow");
+                self.settling_fee = self.settling_fee.checked_sub(invoice.fee_amount).expect("Ledger underflow");
+                self.held = self.held.checked_add(invoice.amount).expect("Ledger overflow");
                 self.fees_available -= collateral;
                 invoice.status = InvoiceStatus::SettlementRecovered;
             }
             OperationType::Refund => {
-                self.refunding_gross = self.refunding_gross.checked_sub(invoice.amount.0).expect("Ledger underflow");
-                self.held = self.held.checked_add(invoice.amount.0).expect("Ledger overflow");
+                self.refunding_gross = self.refunding_gross.checked_sub(invoice.amount).expect("Ledger underflow");
+                self.held = self.held.checked_add(invoice.amount).expect("Ledger overflow");
                 self.fees_available -= collateral;
                 invoice.status = InvoiceStatus::RefundRecovered;
             }
@@ -557,13 +557,13 @@ impl Contract {
                 require!(now >= invoice.operation_started_at.unwrap_or(0).saturating_add(WAIT_NS), "Close delay has not elapsed");
                 match invoice.operation_type.expect("Operation type missing") {
                     OperationType::Settle => {
-                        self.settling_gross -= invoice.amount.0;
-                        self.settling_fee -= invoice.fee_amount.0;
-                        self.fees_available = self.fees_available.checked_add(invoice.fee_amount.0).expect("Fee overflow");
+                        self.settling_gross -= invoice.amount;
+                        self.settling_fee -= invoice.fee_amount;
+                        self.fees_available = self.fees_available.checked_add(invoice.fee_amount).expect("Fee overflow");
                         invoice.status = InvoiceStatus::Paid;
                     }
                     OperationType::Refund => {
-                        self.refunding_gross -= invoice.amount.0;
+                        self.refunding_gross -= invoice.amount;
                         invoice.status = InvoiceStatus::Refunded;
                     }
                 }
@@ -572,12 +572,12 @@ impl Contract {
                 require!(now >= invoice.recovered_at.unwrap_or(0).saturating_add(WAIT_NS), "Close delay has not elapsed");
                 match invoice.operation_type.expect("Operation type missing") {
                     OperationType::Settle => {
-                        self.held -= invoice.amount.0;
-                        self.fees_available = self.fees_available.checked_add(invoice.fee_amount.0).expect("Fee overflow");
+                        self.held -= invoice.amount;
+                        self.fees_available = self.fees_available.checked_add(invoice.fee_amount).expect("Fee overflow");
                         invoice.status = InvoiceStatus::Paid;
                     }
                     OperationType::Refund => {
-                        self.held -= invoice.amount.0;
+                        self.held -= invoice.amount;
                         invoice.status = InvoiceStatus::Refunded;
                     }
                 }
@@ -708,9 +708,9 @@ impl Contract {
             let expected_recipient = if operation == OperationType::Settle {
                 invoice.treasury_snapshot.clone().expect("Treasury snapshot missing")
             } else { invoice.payer.clone().expect("Payer snapshot missing") };
-            let expected_amount = if operation == OperationType::Settle { invoice.net_amount.0 } else { invoice.amount.0 };
+            let expected_amount = if operation == OperationType::Settle { invoice.net_amount } else { invoice.amount };
             require!(invoice.operation_recipient.as_ref() == Some(&expected_recipient), "Pinned recipient mismatch");
-            require!(invoice.operation_amount.0 == expected_amount, "Pinned amount mismatch");
+            require!(invoice.operation_amount == expected_amount, "Pinned amount mismatch");
         } else {
             let payer = invoice.payer.clone().expect("Payer snapshot missing");
             let treasury = invoice.treasury_snapshot.clone().expect("Treasury snapshot missing");
@@ -725,14 +725,14 @@ impl Contract {
         invoice.operation_from_recovered = recovered;
         match operation {
             OperationType::Settle => {
-                self.held = self.held.checked_sub(invoice.amount.0).expect("Ledger underflow");
-                self.settling_gross = self.settling_gross.checked_add(invoice.amount.0).expect("Ledger overflow");
-                self.settling_fee = self.settling_fee.checked_add(invoice.fee_amount.0).expect("Ledger overflow");
+                self.held = self.held.checked_sub(invoice.amount).expect("Ledger underflow");
+                self.settling_gross = self.settling_gross.checked_add(invoice.amount).expect("Ledger overflow");
+                self.settling_fee = self.settling_fee.checked_add(invoice.fee_amount).expect("Ledger overflow");
                 invoice.status = InvoiceStatus::Settling;
             }
             OperationType::Refund => {
-                self.held = self.held.checked_sub(invoice.amount.0).expect("Ledger underflow");
-                self.refunding_gross = self.refunding_gross.checked_add(invoice.amount.0).expect("Ledger overflow");
+                self.held = self.held.checked_sub(invoice.amount).expect("Ledger underflow");
+                self.refunding_gross = self.refunding_gross.checked_add(invoice.amount).expect("Ledger overflow");
                 invoice.status = InvoiceStatus::Refunding;
             }
         }
@@ -759,21 +759,21 @@ impl Contract {
         let succeeded = matches!(env::promise_result(0), PromiseResult::Successful(_));
         match (operation, succeeded) {
             (OperationType::Settle, true) => {
-                self.settling_gross -= invoice.amount.0;
-                self.settling_fee -= invoice.fee_amount.0;
-                self.fees_available = self.fees_available.checked_add(invoice.fee_amount.0).expect("Fee overflow");
+                self.settling_gross -= invoice.amount;
+                self.settling_fee -= invoice.fee_amount;
+                self.fees_available = self.fees_available.checked_add(invoice.fee_amount).expect("Fee overflow");
                 invoice.status = InvoiceStatus::Paid;
                 Self::clear_operation(&mut invoice);
             }
             (OperationType::Refund, true) => {
-                self.refunding_gross -= invoice.amount.0;
+                self.refunding_gross -= invoice.amount;
                 invoice.status = InvoiceStatus::Refunded;
                 Self::clear_operation(&mut invoice);
             }
             (OperationType::Settle, false) => {
-                self.settling_gross -= invoice.amount.0;
-                self.settling_fee -= invoice.fee_amount.0;
-                self.held = self.held.checked_add(invoice.amount.0).expect("Ledger overflow");
+                self.settling_gross -= invoice.amount;
+                self.settling_fee -= invoice.fee_amount;
+                self.held = self.held.checked_add(invoice.amount).expect("Ledger overflow");
                 invoice.status = if invoice.operation_from_recovered { InvoiceStatus::SettlementRecovered } else { InvoiceStatus::PaymentReceived };
                 invoice.active_attempt_id = None;
                 invoice.operation_started_at = None;
@@ -781,8 +781,8 @@ impl Contract {
                 if invoice.operation_from_recovered { invoice.recovered_at = Some(env::block_timestamp()); }
             }
             (OperationType::Refund, false) => {
-                self.refunding_gross -= invoice.amount.0;
-                self.held = self.held.checked_add(invoice.amount.0).expect("Ledger overflow");
+                self.refunding_gross -= invoice.amount;
+                self.held = self.held.checked_add(invoice.amount).expect("Ledger overflow");
                 invoice.status = if invoice.operation_from_recovered { InvoiceStatus::RefundRecovered } else { InvoiceStatus::PaymentReceived };
                 invoice.active_attempt_id = None;
                 invoice.operation_started_at = None;
@@ -798,7 +798,7 @@ impl Contract {
         invoice.active_attempt_id = None;
         invoice.operation_type = None;
         invoice.operation_recipient = None;
-        invoice.operation_amount = U128(0);
+        invoice.operation_amount = 0;
         invoice.operation_started_at = None;
         invoice.operation_from_recovered = false;
         invoice.recovered_at = None;
@@ -847,7 +847,7 @@ impl FungibleTokenReceiver for Contract {
         if self.paused { return PromiseOrValue::Value(amount); }
         let Some(mut invoice) = self.invoices.get(&msg) else { return PromiseOrValue::Value(amount); };
         let Some(school) = self.schools.get(&invoice.school_id) else { return PromiseOrValue::Value(amount); };
-        if invoice.status != InvoiceStatus::Pending || school.status != SchoolStatus::Active || amount.0 != invoice.amount.0 {
+        if invoice.status != InvoiceStatus::Pending || school.status != SchoolStatus::Active || amount.0 != invoice.amount {
             return PromiseOrValue::Value(amount);
         }
         let money_at_risk = self.held.checked_add(self.settling_gross).and_then(|x| x.checked_add(self.refunding_gross)).unwrap_or(u128::MAX);
@@ -858,8 +858,8 @@ impl FungibleTokenReceiver for Contract {
         let net = amount.0.checked_sub(fee).expect("Fee exceeds amount");
         invoice.payer = Some(sender_id);
         invoice.treasury_snapshot = Some(school.treasury.clone());
-        invoice.fee_amount = U128(fee);
-        invoice.net_amount = U128(net);
+        invoice.fee_amount = fee;
+        invoice.net_amount = net;
         invoice.paid_at = Some(env::block_timestamp());
         invoice.status = InvoiceStatus::PaymentReceived;
         self.held = self.held.checked_add(amount.0).expect("Ledger overflow");
