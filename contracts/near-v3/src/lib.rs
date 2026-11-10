@@ -1,7 +1,7 @@
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::{
     env, ext_contract, near, require,
-    json_types::U128,
+    json_types::{U128, U64},
     AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue,
     PromiseResult,
 };
@@ -238,6 +238,20 @@ pub struct Accounting {
     pub min_liability: U128,
     pub max_liability: U128,
     pub money_at_risk: U128,
+}
+
+#[near(serializers = [json])]
+pub struct WithdrawalView {
+    pub withdrawal_id: U64,
+    pub amount: U128,
+    pub recipient: AccountId,
+    pub started_at: U64,
+    pub active: bool,
+}
+impl From<Withdrawal> for WithdrawalView {
+    fn from(w: Withdrawal) -> Self {
+        Self { withdrawal_id: U64(w.withdrawal_id), amount: U128(w.amount), recipient: w.recipient, started_at: U64(w.started_at), active: w.active }
+    }
 }
 
 #[near(serializers = [json])]
@@ -699,7 +713,7 @@ impl Contract {
 
     pub fn finalize_storage_withdrawal_as_sent(&mut self, withdrawal_id: u64, evidence: String) {
         self.assert_owner();
-        require!(evidence.len() <= MAX_EVIDENCE_BYTES, "Evidence note is too long");
+        require!(evidence.len() <= MAX_EVIDENCE, "Evidence note is too long");
         let withdrawal = self.storage_withdrawals.get(&withdrawal_id).expect("Storage withdrawal not found");
         require!(withdrawal.active, "Storage withdrawal is not active");
         require!(env::block_timestamp() >= withdrawal.started_at.saturating_add(WAIT_NS), "Storage withdrawal recovery delay has not elapsed");
@@ -987,6 +1001,10 @@ impl Contract {
     pub fn pause(&mut self) { self.assert_owner(); self.paused = true; }
     pub fn unpause(&mut self) { self.assert_owner(); self.paused = false; }
     pub fn set_allow_retry(&mut self, allow: bool) { self.assert_owner(); self.allow_retry = allow; }
+
+    pub fn get_withdrawal(&self, withdrawal_id: u64) -> Option<WithdrawalView> {
+        self.withdrawals.get(&withdrawal_id).map(Into::into)
+    }
 
     pub fn get_config(&self) -> ConfigView {
         ConfigView {
