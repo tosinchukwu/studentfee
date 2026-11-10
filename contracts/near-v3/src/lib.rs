@@ -1312,6 +1312,10 @@ mod tests {
         let accepted = contract.ft_on_transfer(account("parent-two.testnet"), U128(GROSS), SECOND_INVOICE.to_string());
         assert!(matches!(accepted, PromiseOrValue::Value(value) if value.0 == 0));
         assert_ledger_invariants(&contract);
+        assert_eq!(contract.get_schools(0, 100).len(), 2);
+        assert_eq!(contract.get_school_invoice_ids(SCHOOL_ID.to_string(), 0, 100), vec![INVOICE_ID.to_string()]);
+        assert_eq!(contract.get_school_invoice_ids(SECOND_SCHOOL.to_string(), 0, 100), vec![SECOND_INVOICE.to_string()]);
+        assert_eq!(contract.get_school_invoices(SECOND_SCHOOL.to_string(), 0, 100).len(), 1);
 
         context("anyone.testnet", 6, None);
         let _settle = contract.settle_invoice(INVOICE_ID.to_string());
