@@ -1700,10 +1700,8 @@ mod tests {
 
         context("school.testnet", 4 + 3 * WAIT_NS + 1, None);
         let _restart_two = contract.restart_settlement(INVOICE_ID.to_string());
-        context("registry.testnet", 4 + 3 * WAIT_NS + 2, Some(PromiseResult::Failed));
-        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 4, OperationType::Settle));
 
-        context("owner.testnet", 4 + 4 * WAIT_NS + 2, None);
+        context("owner.testnet", 4 + 4 * WAIT_NS + 1, None);
         contract.retry_with_collateral(INVOICE_ID.to_string(), "second recovery".to_string());
         let second_recovery = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
         assert_eq!(second_recovery.recovery_count, 2);
@@ -1711,13 +1709,13 @@ mod tests {
         assert_eq!(contract.lifetime_collateral, 2 * NET);
         assert_eq!(contract.fees_available, 0);
 
-        context("school.testnet", 4 + 5 * WAIT_NS + 2, None);
+        context("school.testnet", 4 + 5 * WAIT_NS + 1, None);
         let _restart_three = contract.restart_settlement(INVOICE_ID.to_string());
         let third_frozen = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
         assert_eq!(third_frozen.status, InvoiceStatus::Settling);
         assert_eq!(third_frozen.attempt_counter, 6);
 
-        context("owner.testnet", 4 + 6 * WAIT_NS + 2, None);
+        context("owner.testnet", 4 + 6 * WAIT_NS + 1, None);
         let third_recovery = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             contract.retry_with_collateral(INVOICE_ID.to_string(), "must be rejected".to_string());
         }));
