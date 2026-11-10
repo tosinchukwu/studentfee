@@ -644,18 +644,20 @@ impl Contract {
         require!(self.platform_treasury.as_ref() != Some(&new_treasury), "Platform treasury cannot be a school treasury");
         school.queued_treasury = Some(new_treasury.clone());
         school.treasury_effective_at = None;
+        school.treasury_change_nonce = school.treasury_change_nonce.checked_add(1).expect("Treasury change nonce overflow");
+        let nonce = school.treasury_change_nonce;
         self.schools.insert(&school_id, &school);
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
             .storage_balance_of(new_treasury.clone())
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
-                .on_queue_treasury_check(school_id, new_treasury))
+                .on_queue_treasury_check(school_id, new_treasury, nonce))
     }
 
     #[private]
-    pub fn on_queue_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool {
+    pub fn on_queue_treasury_check(&mut self, school_id: String, new_treasury: AccountId, nonce: u64) -> bool {
         if let Some(mut school) = self.schools.get(&school_id) {
-            if school.queued_treasury.as_ref() != Some(&new_treasury) || school.treasury_effective_at.is_some() {
+            if school.treasury_change_nonce != nonce || school.queued_treasury.as_ref() != Some(&new_treasury) || school.treasury_effective_at.is_some() {
                 return false;
             }
             let available = Self::storage_balance_result()
@@ -680,6 +682,7 @@ impl Contract {
         require!(school.queued_treasury.is_some(), "No treasury change is queued");
         school.queued_treasury = None;
         school.treasury_effective_at = None;
+        school.treasury_change_nonce = school.treasury_change_nonce.checked_add(1).expect("Treasury change nonce overflow");
         self.schools.insert(&school_id, &school);
         env::log_str(&format!("SCHOOL_TREASURY_CHANGE_CANCELLED:{}", school_id));
     }
@@ -689,6 +692,7 @@ impl Contract {
         let school = self.get_admin_school(&school_id);
         let new_treasury = school.queued_treasury.clone().expect("No treasury change queued");
         let effective = school.treasury_effective_at.expect("No effective time");
+        let nonce = school.treasury_change_nonce;
         require!(env::block_timestamp() >= effective, "Treasury delay has not elapsed");
         require!(self.treasury_index.get(&new_treasury).is_none(), "Treasury is already assigned to another school");
         require!(self.admin_index.get(&new_treasury).is_none(), "A school administrator cannot be a treasury");
@@ -697,14 +701,15 @@ impl Contract {
             .with_static_gas(FT_GAS)
             .storage_balance_of(new_treasury.clone())
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
-                .on_apply_treasury_check(school_id, new_treasury))
+                .on_apply_treasury_check(school_id, new_treasury, nonce))
     }
 
     #[private]
-    pub fn on_apply_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool {
+    pub fn on_apply_treasury_check(&mut self, school_id: String, new_treasury: AccountId, nonce: u64) -> bool {
         if !Self::storage_balance_result() { return false; }
         if let Some(mut school) = self.schools.get(&school_id) {
-            if school.queued_treasury.as_ref() != Some(&new_treasury)
+            if school.treasury_change_nonce != nonce
+                || school.queued_treasury.as_ref() != Some(&new_treasury)
                 || school.treasury_effective_at.map(|time| env::block_timestamp() >= time) != Some(true)
                 || self.treasury_index.get(&new_treasury).is_some()
                 || self.platform_treasury.as_ref() == Some(&new_treasury)
