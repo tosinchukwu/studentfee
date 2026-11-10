@@ -159,7 +159,7 @@ trait ExtFt {
 #[ext_contract(ext_self)]
 trait ExtSelf {
     fn on_school_treasury_check(&mut self, school_id: String, admin: AccountId) -> bool;
-    fn on_approval_treasury_check(&mut self, school_id: String) -> bool;
+    fn on_approval_treasury_check(&mut self, school_id: String, fee_bps: u16) -> bool;
     fn on_platform_treasury_check(&mut self, account_id: AccountId) -> bool;
     fn on_transfer_complete(&mut self, invoice_id: String, attempt_id: u64, operation: OperationType) -> bool;
     fn on_fee_withdrawal_complete(&mut self, withdrawal_id: u64) -> bool;
@@ -286,11 +286,11 @@ impl Contract {
             .with_static_gas(FT_GAS)
             .storage_balance_of(school.treasury)
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
-                .on_approval_treasury_check(school_id))
+                .on_approval_treasury_check(school_id, fee_bps))
     }
 
     #[private]
-    pub fn on_approval_treasury_check(&mut self, school_id: String) -> bool {
+    pub fn on_approval_treasury_check(&mut self, school_id: String, fee_bps: u16) -> bool {
         let registered = Self::storage_balance_result();
         if !registered { return false; }
         if let Some(mut school) = self.schools.get(&school_id) {
@@ -847,7 +847,7 @@ impl FungibleTokenReceiver for Contract {
         }
         if self.paused { return PromiseOrValue::Value(amount); }
         let Some(mut invoice) = self.invoices.get(&msg) else { return PromiseOrValue::Value(amount); };
-        let Some(mut school) = self.schools.get(&invoice.school_id) else { return PromiseOrValue::Value(amount); };
+        let Some(school) = self.schools.get(&invoice.school_id) else { return PromiseOrValue::Value(amount); };
         if invoice.status != InvoiceStatus::Pending || school.status != SchoolStatus::Active || amount.0 != invoice.amount.0 {
             return PromiseOrValue::Value(amount);
         }
