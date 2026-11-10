@@ -312,6 +312,8 @@ impl Contract {
     #[init]
     pub fn new(owner: AccountId, usdc_token: AccountId) -> Self {
         require!(owner != env::current_account_id(), "Owner cannot be the contract account");
+        require!(usdc_token != env::current_account_id(), "USDC token cannot be the contract account");
+        require!(owner != usdc_token, "Owner and USDC token must be separate accounts");
         Self {
             owner,
             proposed_owner: None,
@@ -2041,6 +2043,25 @@ mod tests {
         context("registry.testnet", 8, Some(PromiseResult::Successful(vec![])));
         assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Refund));
         assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Refunded);
+    }
+
+    #[test]
+    fn constructor_rejects_owner_or_token_aliasing_the_registry_account() {
+        let mut builder = VMContextBuilder::new();
+        builder.current_account_id(account("registry.testnet")).predecessor_account_id(account("owner.testnet"));
+        testing_env!(builder.build());
+        let owner_is_registry = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            Contract::new(account("registry.testnet"), account("usdc.testnet"));
+        }));
+        assert!(owner_is_registry.is_err());
+        let token_is_registry = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            Contract::new(account("owner.testnet"), account("registry.testnet"));
+        }));
+        assert!(token_is_registry.is_err());
+        let owner_is_token = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            Contract::new(account("usdc.testnet"), account("usdc.testnet"));
+        }));
+        assert!(owner_is_token.is_err());
     }
 
     #[test]
