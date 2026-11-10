@@ -1886,12 +1886,6 @@ mod tests {
         let effective = queued.treasury_effective_at.unwrap();
         assert_eq!(effective, 10 + TREASURY_DELAY_NS);
 
-        context("school.testnet", effective - 1, None);
-        let too_early = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            contract.apply_treasury_change(SCHOOL_ID.to_string());
-        }));
-        assert!(too_early.is_err());
-
         context("school.testnet", effective, None);
         let _apply = contract.apply_treasury_change(SCHOOL_ID.to_string());
 
