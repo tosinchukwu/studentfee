@@ -1506,7 +1506,7 @@ mod tests {
         context("owner.testnet", 4 + WAIT_NS, None);
         contract.cancel_platform_treasury_verification();
         context("registry.testnet", 5 + WAIT_NS, Some(PromiseResult::Successful(vec![])));
-        assert!(!contract.on_platform_treasury_check(account("platform-treasury.testnet")));
+        assert!(!contract.on_platform_treasury_check(account("platform-treasury.testnet"), 1));
         assert_eq!(contract.platform_treasury, None);
 
         context("owner.testnet", 6 + WAIT_NS, None);
@@ -1514,7 +1514,7 @@ mod tests {
         let balance = StorageBalance { total: U128(1), available: U128(0) };
         let result = near_sdk::serde_json::to_vec(&Some(balance)).unwrap();
         context("registry.testnet", 7 + WAIT_NS, Some(PromiseResult::Successful(result.clone())));
-        assert!(contract.on_platform_treasury_check(account("platform-treasury.testnet")));
+        assert!(contract.on_platform_treasury_check(account("platform-treasury.testnet"), 3));
         assert_eq!(contract.platform_treasury, Some(account("platform-treasury.testnet")));
         assert_eq!(contract.pending_platform_treasury, None);
         assert!(!contract.on_platform_treasury_check(account("platform-treasury.testnet")));
@@ -1538,7 +1538,7 @@ mod tests {
         context("owner.testnet", 5, None);
         let _failed_check = contract.approve_school(SCHOOL_ID.to_string(), 500);
         context("registry.testnet", 6, Some(PromiseResult::Failed));
-        assert!(!contract.on_approval_treasury_check(SCHOOL_ID.to_string(), 500));
+        assert!(!contract.on_approval_treasury_check(SCHOOL_ID.to_string(), 500, account("treasury.testnet"), 1));
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::PendingApproval);
 
         context("owner.testnet", 7, None);
@@ -1546,7 +1546,7 @@ mod tests {
         let balance = StorageBalance { total: U128(1), available: U128(0) };
         let result = near_sdk::serde_json::to_vec(&Some(balance)).unwrap();
         context("registry.testnet", 8, Some(PromiseResult::Successful(result)));
-        assert!(contract.on_approval_treasury_check(SCHOOL_ID.to_string(), 500));
+        assert!(contract.on_approval_treasury_check(SCHOOL_ID.to_string(), 500, account("treasury.testnet"), 2));
         let approved = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
         assert_eq!(approved.status, SchoolStatus::Active);
         assert_eq!(approved.fee_bps, 500);
@@ -1676,14 +1676,14 @@ mod tests {
         let storage_balance = StorageBalance { total: U128(1), available: U128(0) };
         let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
         context("registry.testnet", 5, Some(PromiseResult::Successful(result.clone())));
-        assert!(contract.on_reactivate_school_check(SCHOOL_ID.to_string()));
+        assert!(contract.on_reactivate_school_check(SCHOOL_ID.to_string(), account("treasury.testnet"), 1));
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::Active);
         assert!(!contract.schools.get(&SCHOOL_ID.to_string()).unwrap().reactivation_pending);
 
         context("owner.testnet", 6, None);
         contract.suspend_school(SCHOOL_ID.to_string());
         context("registry.testnet", 7, Some(PromiseResult::Successful(result.clone())));
-        assert!(!contract.on_reactivate_school_check(SCHOOL_ID.to_string()));
+        assert!(!contract.on_reactivate_school_check(SCHOOL_ID.to_string(), account("treasury.testnet"), 2));
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::Suspended);
 
         context("owner.testnet", 8, None);
@@ -1855,20 +1855,20 @@ mod tests {
         let storage_balance = StorageBalance { total: U128(1), available: U128(0) };
         let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
         context("registry.testnet", 6, Some(PromiseResult::Successful(result.clone())));
-        assert!(!contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        assert!(!contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 1));
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().queued_treasury, None);
 
         context("school.testnet", 7, None);
         let _failed_check = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
         context("registry.testnet", 8, Some(PromiseResult::Failed));
-        assert!(!contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        assert!(!contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 3));
         let after_failure = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
         assert_eq!(after_failure.queued_treasury, None);
 
         context("school.testnet", 9, None);
         let _queue = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
         context("registry.testnet", 10, Some(PromiseResult::Successful(result.clone())));
-        assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 4));
         let queued = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
         let effective = queued.treasury_effective_at.unwrap();
         assert_eq!(effective, 10 + TREASURY_DELAY_NS);
@@ -1882,13 +1882,13 @@ mod tests {
         context("school.testnet", effective, None);
         let _apply = contract.apply_treasury_change(SCHOOL_ID.to_string());
         context("registry.testnet", effective + 1, Some(PromiseResult::Successful(result)));
-        assert!(contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        assert!(contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 4));
         let changed = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
         assert_eq!(changed.treasury, account("new-treasury.testnet"));
         assert_eq!(changed.queued_treasury, None);
         assert_eq!(contract.treasury_index.get(&account("treasury.testnet")), None);
         assert_eq!(contract.treasury_index.get(&account("new-treasury.testnet")), Some(SCHOOL_ID.to_string()));
-        assert!(!contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        assert!(!contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 1));
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().treasury, account("new-treasury.testnet"));
     }
 
@@ -2034,7 +2034,7 @@ mod tests {
         let storage_balance = StorageBalance { total: U128(1), available: U128(0) };
         let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
         context("registry.testnet", 8, Some(PromiseResult::Successful(result.clone())));
-        assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 1));
         let effective = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().treasury_effective_at.unwrap();
 
         context("replacement-admin.testnet", effective, None);
