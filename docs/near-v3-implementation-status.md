@@ -22,14 +22,14 @@ The v3 Rust package lives at `contracts/near-v3`. It is a separate contract from
 - Nine-state v3 lifecycle, recovered settlement/refund paths, owner-only collateral recovery and close-as-sent.
 - Platform fee accounting, verified platform treasury, fee withdrawals and stuck-withdrawal finalization.
 - Pause controls, accounting bucket views, school/invoice views and per-school invoice indexing.
-- 30 passing Rust unit tests covering snapshots, successful/failed settlement, refund terminality, two-recovery cap, stale/duplicate callbacks, school isolation, payment caps, fee-withdrawal recovery, measured storage registration/refunds, storage-withdrawal replay, role separation, reserve/gas guards, reactivation/platform-treasury callback races, and a two-school interleaved ledger scenario.
+- 49 passing Rust unit tests on the current branch. The latest GitHub Actions run executed the suite twice (normal and `--locked`): 49 passed, 0 failed. Coverage includes payment snapshots, settlement/refund success and failure, terminal statuses, two-recovery limits, stale/duplicate callbacks, school isolation, payment and collateral caps, fee-withdrawal recovery, measured storage registration/refunds, storage-withdrawal replay, role separation (including pending-registration owner conflicts), reserve/gas guards, treasury/reactivation callback races, and two-school ledger interleaving.
 - Committed `Cargo.lock`; CI reruns tests and WebAssembly compilation with `--locked`.
 
-## Not complete; deployment is blocked
+## Latest CI artifact and remaining deployment blockers\n\nLatest verified run on commit `d926978cbabc190f8a56ed66d6e834241fc50c52` (2026-11-10): NEAR v3 Rust tests passed (49/49, including locked rerun), optimized WebAssembly build and ABI generation passed, and frontend TypeScript typecheck plus production build passed. Optimized WASM: `contracts/near-v3/target/near/studentfee_registry_v3.wasm`, 289,112 bytes (289.1 KB), SHA-256 `d21a11297d237cab986d6600785453d7c3fd18a0ec798825bb3d70e1b392a9a3`. CI artifact `near-v3-optimized-wasm-and-abi` was uploaded (artifact ID `13799583034`).\n\n## Not complete; deployment is blocked
 
 The current code is an implementation draft, not a deployment-ready release. Before a testnet deployment:
 
-1. Complete the remaining acceptance suite in `docs/multi-school-final-spec.md`, especially randomized accounting invariants, full recovery/refund matrices, treasury-change callback races, and two simultaneous payments on testnet.
+1. Complete the remaining acceptance suite in `docs/multi-school-final-spec.md`, especially the 300-step randomized accounting model, any uncovered recovery/refund matrix cases, and two simultaneous payments on testnet.
 2. Measure worst-case transfer/callback gas on testnet and tune the provisional 70 Tgas call minimum, 15 Tgas FT calls, 25 Tgas callbacks and 0.1 NEAR free-balance floor. These are guardrails, not measured deployment parameters.
 3. Complete the storage accounting review and expand failure/replay coverage across every callback path; current unit coverage is broad but not a substitute for the full acceptance matrix.
 4. Generate and review the final ABI and optimized WASM; record the artifact hash.
