@@ -2791,6 +2791,24 @@ mod tests {
     }
 
     #[test]
+    fn pending_registration_treasury_cannot_become_platform_owner() {
+        let (mut contract, _, _) = funded_contract();
+        let candidate = account("pending-reg-treasury.testnet");
+        let mut school = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        school.treasury = candidate.clone();
+        school.treasury_verified = false;
+        contract.schools.insert(&SCHOOL_ID.to_string(), &school);
+
+        context("owner.testnet", 4, None);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.propose_owner(candidate.clone());
+        }));
+        assert!(result.is_err());
+        assert!(contract.has_pending_registration_treasury(&candidate));
+        assert_eq!(contract.proposed_owner, None);
+    }
+
+    #[test]
     #[should_panic(expected = "A reserved school treasury cannot be the platform treasury")]
     fn queued_school_treasury_cannot_become_platform_treasury() {
         let (mut contract, _, _) = funded_contract();
