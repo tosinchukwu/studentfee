@@ -2573,35 +2573,39 @@ mod tests {
     }
 
     #[test]
-    fn close_as_sent_handles_frozen_and_recovered_refunds_without_releasing_school_funds() {
-        let (mut frozen, _, _) = funded_contract();
+    fn close_as_sent_handles_frozen_refunds_without_releasing_school_funds() {
+        let (mut contract, _, _) = funded_contract();
         context("school.testnet", 4, None);
-        drop(frozen.refund_payment(INVOICE_ID.to_string()));
+        drop(contract.refund_payment(INVOICE_ID.to_string()));
         context("owner.testnet", 4 + WAIT_NS, None);
-        frozen.close_as_sent(INVOICE_ID.to_string(), "refund receipt checked".to_string());
-        let closed_frozen = frozen.invoices.get(&INVOICE_ID.to_string()).unwrap();
-        assert_eq!(closed_frozen.status, InvoiceStatus::Refunded);
-        assert_eq!(closed_frozen.attempt_counter, 2);
-        assert_eq!(closed_frozen.active_attempt_id, None);
-        assert_eq!(closed_frozen.operation_type, None);
-        assert_eq!(frozen.refunding_gross, 0);
-        let (mut recovered, _, _) = funded_contract();
-        recovered.fees_available = GROSS;
+        contract.close_as_sent(INVOICE_ID.to_string(), "refund receipt checked".to_string());
+        let closed = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(closed.status, InvoiceStatus::Refunded);
+        assert_eq!(closed.attempt_counter, 2);
+        assert_eq!(closed.active_attempt_id, None);
+        assert_eq!(closed.operation_type, None);
+        assert_eq!(contract.refunding_gross, 0);
+    }
+
+    #[test]
+    fn close_as_sent_handles_recovered_refunds_without_releasing_school_funds() {
+        let (mut contract, _, _) = funded_contract();
+        contract.fees_available = GROSS;
         context("school.testnet", 4, None);
-        drop(recovered.refund_payment(INVOICE_ID.to_string()));
+        drop(contract.refund_payment(INVOICE_ID.to_string()));
         context("owner.testnet", 4 + WAIT_NS, None);
-        recovered.retry_with_collateral(INVOICE_ID.to_string(), "refund collateral".to_string());
-        assert_eq!(recovered.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::RefundRecovered);
+        contract.retry_with_collateral(INVOICE_ID.to_string(), "refund collateral".to_string());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::RefundRecovered);
         context("owner.testnet", 4 + 2 * WAIT_NS, None);
-        recovered.close_as_sent(INVOICE_ID.to_string(), "recovered refund receipt checked".to_string());
-        let closed_recovered = recovered.invoices.get(&INVOICE_ID.to_string()).unwrap();
-        assert_eq!(closed_recovered.status, InvoiceStatus::Refunded);
-        assert_eq!(closed_recovered.attempt_counter, 3);
-        assert_eq!(closed_recovered.active_attempt_id, None);
-        assert_eq!(closed_recovered.operation_type, None);
-        assert_eq!(recovered.held, 0);
-        assert_eq!(recovered.refunding_gross, 0);
-        assert_eq!(recovered.lifetime_collateral, GROSS);
+        contract.close_as_sent(INVOICE_ID.to_string(), "recovered refund receipt checked".to_string());
+        let closed = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(closed.status, InvoiceStatus::Refunded);
+        assert_eq!(closed.attempt_counter, 3);
+        assert_eq!(closed.active_attempt_id, None);
+        assert_eq!(closed.operation_type, None);
+        assert_eq!(contract.held, 0);
+        assert_eq!(contract.refunding_gross, 0);
+        assert_eq!(contract.lifetime_collateral, GROSS);
     }
 
     #[test]
