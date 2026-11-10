@@ -384,6 +384,19 @@ impl Contract {
                 .on_school_treasury_check(school_id, admin))
     }
 
+    pub fn cancel_school_registration(&mut self, school_id: String) {
+        self.assert_owner();
+        let school = self.schools.get(&school_id).expect("School not found");
+        require!(school.status == SchoolStatus::PendingApproval && !school.treasury_verified, "School registration is not pending verification");
+        require!(env::block_timestamp() >= school.created_at.saturating_add(WAIT_NS), "School registration cancellation delay has not elapsed");
+        self.schools.remove(&school_id);
+        self.admin_index.remove(&school.admin);
+        self.prepaid_storage_total = self.prepaid_storage_total.checked_sub(school.storage_balance).expect("Storage liability underflow");
+        let refund = school.storage_balance.checked_add(school.registration_storage_cost).expect("Registration refund overflow");
+        Promise::new(school.admin).transfer(NearToken::from_yoctonear(refund));
+        env::log_str(&format!("SCHOOL_REGISTRATION_CANCELLED:{}", school_id));
+    }
+
     #[private]
     pub fn on_school_treasury_check(&mut self, school_id: String, admin: AccountId) -> bool {
         let registered = Self::storage_balance_result();
@@ -1485,6 +1498,46 @@ mod tests {
         assert_eq!(registered.status, SchoolStatus::PendingApproval);
         assert_eq!(contract.treasury_index.get(&account("second-treasury.testnet")), Some(second_id));
         assert_eq!(contract.prepaid_storage_total, registered.storage_balance);
+    }
+
+    #[test]
+    fn owner_can_cancel_a_timed_out_registration_and_late_callback_is_ignored() {
+        let owner = account("owner.testnet");
+        context("owner.testnet", 1, None);
+        let mut contract = Contract::new(owner, account("usdc.testnet"));
+        let deposit = NearToken::from_near(1).as_yoctonear();
+        let mut builder = VMContextBuilder::new();
+        builder
+            .current_account_id(account("registry.testnet"))
+            .predecessor_account_id(account("pending-school.testnet"))
+            .block_timestamp(2)
+            .account_balance(NearToken::from_near(10))
+            .prepaid_gas(Gas::from_tgas(300))
+            .attached_deposit(NearToken::from_yoctonear(deposit));
+        testing_env!(builder.build());
+        let _registration = contract.register_school(
+            "Pending School".to_string(),
+            "No treasury callback".to_string(),
+            account("pending-treasury.testnet"),
+        );
+        let school_id = "00000000000000000000000000000000".to_string();
+        let too_early = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.cancel_school_registration(school_id.clone());
+        }));
+        assert!(too_early.is_err());
+
+        context("owner.testnet", 2 + WAIT_NS, None);
+        contract.cancel_school_registration(school_id.clone());
+        assert!(contract.schools.get(&school_id).is_none());
+        assert!(contract.admin_index.get(&account("pending-school.testnet")).is_none());
+        assert_eq!(contract.prepaid_storage_total, 0);
+
+        let balance = StorageBalance { total: U128(deposit), available: U128(0) };
+        let result = near_sdk::serde_json::to_vec(&Some(balance)).unwrap();
+        context("registry.testnet", 3 + WAIT_NS, Some(PromiseResult::Successful(result)));
+        assert!(!contract.on_school_treasury_check(school_id, account("pending-school.testnet")));
+        assert_eq!(contract.schools.len(), 0);
+        assert_eq!(contract.prepaid_storage_total, 0);
     }
 
     #[test]
