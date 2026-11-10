@@ -24,12 +24,12 @@ Implementation is in progress. This package is **not deployable or approved for 
 
 ## Build and tests
 
-Use NEAR SDK 5.5.0 and a current stable Rust toolchain. The contract's minimum supported Rust version is 1.86; the optimized CI build uses the pinned `cargo-near` 0.22.0 release.
+Use NEAR SDK 5.5.0 and Rust 1.86.0 for the WebAssembly artifact. `cargo-near` enforces this version because the pinned SDK targets NEAR protocol versions below 84. CI runs native unit tests on stable Rust, then builds the optimized contract with the pinned `cargo-near` 0.22.0 release and Rust 1.86.0.
 
 ```sh
 cd contracts/near-v3
 cargo test --locked
-cargo near build non-reproducible-wasm --locked
+cargo +1.86.0 near build non-reproducible-wasm --locked
 ```
 
 The `cargo near` command produces an optimized WASM and ABI, but this non-reproducible build is still a review artifact, not authorization to deploy. A deployment candidate must have its artifact hash recorded and independently reviewed, then be deployed to a new dedicated testnet account only after owner identity, account IDs, USDC registration, gas/storage measurements, and the complete acceptance suite are verified.
