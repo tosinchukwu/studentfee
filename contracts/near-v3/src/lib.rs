@@ -79,6 +79,7 @@ pub struct School {
     pub treasury_verified: bool,
     pub fee_bps: u16,
     pub storage_balance: u128,
+    pub registration_storage_cost: u128,
     pub created_at: u64,
     pub queued_treasury: Option<AccountId>,
     pub treasury_effective_at: Option<u64>,
@@ -346,13 +347,22 @@ impl Contract {
             treasury_verified: false,
             fee_bps: DEFAULT_FEE_BPS,
             storage_balance: env::attached_deposit().as_yoctonear(),
+            registration_storage_cost: 0,
             created_at: env::block_timestamp(),
             queued_treasury: None,
             treasury_effective_at: None,
             proposed_admin: None,
         };
+        let before = env::storage_usage();
         self.schools.insert(&school_id, &school);
         self.admin_index.insert(&admin, &school_id);
+        let bytes = env::storage_usage().saturating_sub(before) as u128;
+        let registration_cost = bytes.checked_mul(env::storage_byte_cost().as_yoctonear()).expect("Registration storage cost overflow");
+        let deposit = school.storage_balance;
+        require!(deposit >= registration_cost, "School deposit does not cover registration storage");
+        school.registration_storage_cost = registration_cost;
+        school.storage_balance = deposit - registration_cost;
+        self.schools.insert(&school_id, &school);
         self.prepaid_storage_total = self.prepaid_storage_total.checked_add(school.storage_balance).expect("Storage liability overflow");
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
@@ -372,7 +382,8 @@ impl Contract {
                 self.schools.remove(&school_id);
                 self.admin_index.remove(&admin);
                 self.prepaid_storage_total = self.prepaid_storage_total.checked_sub(school.storage_balance).expect("Storage liability underflow");
-                Promise::new(admin).transfer(NearToken::from_yoctonear(school.storage_balance));
+                let refund = school.storage_balance.checked_add(school.registration_storage_cost).expect("Registration refund overflow");
+                Promise::new(admin).transfer(NearToken::from_yoctonear(refund));
                 env::log_str("SCHOOL_REGISTRATION_REJECTED_TREASURY_NOT_AVAILABLE");
                 return false;
             }
@@ -1142,6 +1153,7 @@ mod tests {
             treasury_verified: true,
             fee_bps: DEFAULT_FEE_BPS,
             storage_balance: 1_000_000_000_000_000_000_000_000,
+            registration_storage_cost: 0,
             created_at: 1,
             queued_treasury: None,
             treasury_effective_at: None,
