@@ -229,6 +229,7 @@ pub struct ConfigView {
     pub owner: AccountId,
     pub usdc_token: AccountId,
     pub platform_treasury: Option<AccountId>,
+    pub pending_platform_treasury: Option<AccountId>,
     pub paused: bool,
     pub allow_retry: bool,
     pub default_fee_bps: u16,
@@ -265,6 +266,8 @@ pub struct Contract {
     usdc_token: AccountId,
     platform_treasury: Option<AccountId>,
     platform_treasury_verified: bool,
+    pending_platform_treasury: Option<AccountId>,
+    pending_platform_treasury_started_at: Option<u64>,
     paused: bool,
     allow_retry: bool,
     next_school_id: u64,
@@ -299,6 +302,8 @@ impl Contract {
             usdc_token,
             platform_treasury: None,
             platform_treasury_verified: false,
+            pending_platform_treasury: None,
+            pending_platform_treasury_started_at: None,
             paused: false,
             allow_retry: true,
             next_school_id: 0,
@@ -839,9 +844,12 @@ impl Contract {
     pub fn set_platform_treasury(&mut self, account_id: AccountId) -> Promise {
         self.assert_owner();
         self.ensure_async_resources();
+        require!(self.pending_platform_treasury.is_none(), "A platform treasury verification is already pending");
         require!(account_id != self.owner && account_id != env::current_account_id(), "Platform treasury must be a separate account");
         require!(self.admin_index.get(&account_id).is_none(), "A school administrator cannot be the platform treasury");
         require!(self.treasury_index.get(&account_id).is_none(), "A school treasury cannot be the platform treasury");
+        self.pending_platform_treasury = Some(account_id.clone());
+        self.pending_platform_treasury_started_at = Some(env::block_timestamp());
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
             .storage_balance_of(account_id.clone())
@@ -851,10 +859,26 @@ impl Contract {
 
     #[private]
     pub fn on_platform_treasury_check(&mut self, account_id: AccountId) -> bool {
-        if !Self::storage_balance_result() || account_id == self.owner || self.admin_index.get(&account_id).is_some() || self.treasury_index.get(&account_id).is_some() { return false; }
+        if self.pending_platform_treasury.as_ref() != Some(&account_id) { return false; }
+        let registered = Self::storage_balance_result();
+        let available = registered && account_id != self.owner
+            && self.admin_index.get(&account_id).is_none()
+            && self.treasury_index.get(&account_id).is_none();
+        self.pending_platform_treasury = None;
+        self.pending_platform_treasury_started_at = None;
+        if !available { return false; }
         self.platform_treasury = Some(account_id);
         self.platform_treasury_verified = true;
         true
+    }
+
+    pub fn cancel_platform_treasury_verification(&mut self) {
+        self.assert_owner();
+        let started = self.pending_platform_treasury_started_at.expect("No platform treasury verification is pending");
+        require!(self.pending_platform_treasury.is_some(), "No platform treasury verification is pending");
+        require!(env::block_timestamp() >= started.saturating_add(WAIT_NS), "Platform treasury cancellation delay has not elapsed");
+        self.pending_platform_treasury = None;
+        self.pending_platform_treasury_started_at = None;
     }
 
     pub fn withdraw_fees(&mut self, amount: U128) -> Promise {
@@ -916,6 +940,7 @@ impl Contract {
             owner: self.owner.clone(),
             usdc_token: self.usdc_token.clone(),
             platform_treasury: self.platform_treasury.clone(),
+            pending_platform_treasury: self.pending_platform_treasury.clone(),
             paused: self.paused,
             allow_retry: self.allow_retry,
             default_fee_bps: DEFAULT_FEE_BPS,
