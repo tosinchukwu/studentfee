@@ -116,6 +116,75 @@ pub struct Withdrawal {
 }
 
 #[near(serializers = [json])]
+pub struct SchoolView {
+    pub school_id: String,
+    pub name: String,
+    pub description: String,
+    pub admin: AccountId,
+    pub treasury: AccountId,
+    pub status: SchoolStatus,
+    pub treasury_verified: bool,
+    pub fee_bps: u16,
+    pub storage_balance: U128,
+    pub created_at: u64,
+    pub queued_treasury: Option<AccountId>,
+    pub treasury_effective_at: Option<u64>,
+    pub proposed_admin: Option<AccountId>,
+}
+
+impl From<School> for SchoolView {
+    fn from(s: School) -> Self {
+        Self {
+            school_id: s.school_id, name: s.name, description: s.description,
+            admin: s.admin, treasury: s.treasury, status: s.status,
+            treasury_verified: s.treasury_verified, fee_bps: s.fee_bps,
+            storage_balance: U128(s.storage_balance), created_at: s.created_at,
+            queued_treasury: s.queued_treasury, treasury_effective_at: s.treasury_effective_at,
+            proposed_admin: s.proposed_admin,
+        }
+    }
+}
+
+#[near(serializers = [json])]
+pub struct InvoiceView {
+    pub invoice_id: String,
+    pub school_id: String,
+    pub amount: U128,
+    pub due_date: u64,
+    pub status: InvoiceStatus,
+    pub fee_bps: u16,
+    pub payer: Option<AccountId>,
+    pub treasury_snapshot: Option<AccountId>,
+    pub fee_amount: U128,
+    pub net_amount: U128,
+    pub paid_at: Option<u64>,
+    pub attempt_counter: u64,
+    pub active_attempt_id: Option<u64>,
+    pub operation_type: Option<OperationType>,
+    pub operation_recipient: Option<AccountId>,
+    pub operation_amount: U128,
+    pub operation_started_at: Option<u64>,
+    pub operation_from_recovered: bool,
+    pub recovery_count: u8,
+    pub recovered_at: Option<u64>,
+}
+
+impl From<Invoice> for InvoiceView {
+    fn from(i: Invoice) -> Self {
+        Self {
+            invoice_id: i.invoice_id, school_id: i.school_id, amount: U128(i.amount),
+            due_date: i.due_date, status: i.status, fee_bps: i.fee_bps, payer: i.payer,
+            treasury_snapshot: i.treasury_snapshot, fee_amount: U128(i.fee_amount),
+            net_amount: U128(i.net_amount), paid_at: i.paid_at, attempt_counter: i.attempt_counter,
+            active_attempt_id: i.active_attempt_id, operation_type: i.operation_type,
+            operation_recipient: i.operation_recipient, operation_amount: U128(i.operation_amount),
+            operation_started_at: i.operation_started_at, operation_from_recovered: i.operation_from_recovered,
+            recovery_count: i.recovery_count, recovered_at: i.recovered_at,
+        }
+    }
+}
+
+#[near(serializers = [json])]
 pub struct StorageBalance {
     pub total: U128,
     pub available: U128,
@@ -411,7 +480,7 @@ impl Contract {
         let mut school = self.get_admin_school(&school_id);
         let amount = env::attached_deposit().as_yoctonear();
         require!(amount > 0, "Attach a storage deposit");
-        school.storage_balance = U128(school.storage_balance.checked_add(amount).expect("Storage balance overflow"));
+        school.storage_balance = school.storage_balance.checked_add(amount).expect("Storage balance overflow");
         self.schools.insert(&school_id, &school);
     }
 
@@ -437,7 +506,7 @@ impl Contract {
         let invoice = Invoice {
             invoice_id: invoice_id.clone(),
             school_id: school_id.clone(),
-            amount,
+            amount: amount.0,
             due_date,
             status: InvoiceStatus::Pending,
             fee_bps: school.fee_bps,
@@ -677,8 +746,8 @@ impl Contract {
         }
     }
 
-    pub fn get_school(&self, school_id: String) -> Option<School> { self.schools.get(&school_id) }
-    pub fn get_invoice(&self, invoice_id: String) -> Option<Invoice> { self.invoices.get(&invoice_id) }
+    pub fn get_school(&self, school_id: String) -> Option<SchoolView> { self.schools.get(&school_id).map(Into::into) }
+    pub fn get_invoice(&self, invoice_id: String) -> Option<InvoiceView> { self.invoices.get(&invoice_id).map(Into::into) }
     pub fn get_school_for_admin(&self, admin: AccountId) -> Option<String> { self.admin_index.get(&admin) }
     pub fn get_accounting(&self) -> Accounting {
         let min_liability = self.held + self.settling_fee + self.fees_available;
