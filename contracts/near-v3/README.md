@@ -4,7 +4,7 @@ This is a new, isolated NEAR contract package. It does not replace, upgrade, or 
 
 ## Status
 
-Implementation is in progress. This package is **not deployable or approved for deployment yet**. The full v3 specification is in `docs/multi-school-final-spec.md`.
+Implementation is in progress. This package is **not deployable or approved for deployment yet**. The full v3 specification is in `docs/multi-school-final-spec.md`. Dependencies are pinned by the committed `Cargo.lock`.
 
 ## Fixed testnet design limits
 
@@ -18,7 +18,8 @@ Implementation is in progress. This package is **not deployable or approved for 
 - Platform fee treasury starts unset; fee withdrawals remain disabled until verified.
 - Owner, school administrators, school treasuries and platform treasury are separate roles; treasury accounts cannot register as school administrators or become owner.
 - A single pending treasury change is allowed per school; asynchronous callbacks are checked against the queued treasury state.
-- A 0.1 NEAR free-balance floor is enforced before contract-initiated asynchronous transfers. The floor is provisional until testnet gas measurements are completed.
+- A 0.1 NEAR free-balance floor and 70 Tgas call minimum are enforced before contract-initiated asynchronous calls. Both are provisional until testnet gas measurements are completed.
+- School reactivation and platform-treasury verification use single-flight pending states, stale-callback guards and owner cancellation after a timeout.
 - The reserve calculation subtracts both storage-locked NEAR and outstanding prepaid school-storage liabilities.
 
 ## Build and tests
@@ -27,8 +28,8 @@ Use Rust 1.86.0 and NEAR SDK 5.5.0 (the same pinned SDK generation as the existi
 
 ```sh
 cd contracts/near-v3
-cargo test
-cargo build --release --target wasm32-unknown-unknown
+cargo test --locked
+cargo build --locked --release --target wasm32-unknown-unknown
 ```
 
 The WASM build command is a compile check only. Deployment must use a separately reviewed artifact and a new dedicated testnet account after owner identity, account IDs, USDC registration, and the complete acceptance suite are verified.
