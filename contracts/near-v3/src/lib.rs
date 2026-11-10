@@ -443,25 +443,47 @@ impl Contract {
     pub fn reactivate_school(&mut self, school_id: String) -> Promise {
         self.assert_owner();
         self.ensure_async_resources();
-        let school = self.schools.get(&school_id).expect("School not found");
+        let mut school = self.schools.get(&school_id).expect("School not found");
         require!(school.status == SchoolStatus::Suspended, "School is not suspended");
+        require!(!school.reactivation_pending, "School reactivation is already pending");
+        school.reactivation_pending = true;
+        school.reactivation_started_at = Some(env::block_timestamp());
+        let treasury = school.treasury.clone();
+        self.schools.insert(&school_id, &school);
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
-            .storage_balance_of(school.treasury)
+            .storage_balance_of(treasury)
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
                 .on_reactivate_school_check(school_id))
     }
 
     #[private]
     pub fn on_reactivate_school_check(&mut self, school_id: String) -> bool {
-        if !Self::storage_balance_result() { return false; }
+        let registered = Self::storage_balance_result();
         if let Some(mut school) = self.schools.get(&school_id) {
-            if school.status != SchoolStatus::Suspended { return false; }
+            if school.status != SchoolStatus::Suspended || !school.reactivation_pending { return false; }
+            school.reactivation_pending = false;
+            school.reactivation_started_at = None;
+            if !registered {
+                self.schools.insert(&school_id, &school);
+                return false;
+            }
             school.treasury_verified = true;
             school.status = SchoolStatus::Active;
             self.schools.insert(&school_id, &school);
             true
         } else { false }
+    }
+
+    pub fn cancel_reactivation(&mut self, school_id: String) {
+        self.assert_owner();
+        let mut school = self.schools.get(&school_id).expect("School not found");
+        require!(school.status == SchoolStatus::Suspended && school.reactivation_pending, "No reactivation is pending");
+        let started = school.reactivation_started_at.expect("Reactivation start time missing");
+        require!(env::block_timestamp() >= started.saturating_add(WAIT_NS), "Reactivation cancellation delay has not elapsed");
+        school.reactivation_pending = false;
+        school.reactivation_started_at = None;
+        self.schools.insert(&school_id, &school);
     }
 
     pub fn set_school_fee(&mut self, school_id: String, fee_bps: u16) {
