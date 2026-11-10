@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Download, LogOut, Plus, Search, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { Activity, ArrowUpRight, CheckCircle2, Clock3, Download, FileText, LogOut, Plus, Search, ShieldCheck, TriangleAlert, Wallet } from 'lucide-react'
 import { clsx } from 'clsx'
 import { toast } from 'sonner'
 import { ApiError, api, session } from '../lib/api'
-import { copyText } from '../lib/format'
+import { copyText, formatDate } from '../lib/format'
 import { formatAmount } from '../lib/money'
 import { clientAdapter } from '../lib/contracts'
 import { friendlyError, isAndroid, useNear } from '../lib/near'
@@ -183,6 +183,14 @@ export default function AdminPage() {
     return { billed, collected, outstanding }
   }, [invoices])
 
+  const paidRate = totals.billed > 0n ? Number((totals.collected * 10000n) / totals.billed) / 100 : 0
+  const recentInvoices = (invoices ?? []).slice(0, 5)
+  const statusSummary = [
+    { label: 'Paid', count: counts.Paid ?? 0, color: 'bg-emerald-500' },
+    { label: 'Pending', count: counts.Pending ?? 0, color: 'bg-sky-500' },
+    { label: 'Processing', count: counts.Processing ?? 0, color: 'bg-amber-500' },
+    { label: 'Overdue', count: counts.Overdue ?? 0, color: 'bg-rose-500' },
+  ]
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return (invoices ?? []).filter(
@@ -308,10 +316,70 @@ export default function AdminPage() {
 
         <HealthStrip health={health} />
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Stat label="Billed" value={`$${formatAmount(totals.billed)}`} />
-          <Stat label="Collected" value={`$${formatAmount(totals.collected)}`} tone="text-emerald-700" />
-          <Stat label="Outstanding" value={`$${formatAmount(totals.outstanding)}`} tone={totals.outstanding > 0n ? 'text-amber-700' : undefined} />
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-5">
+            <div className="flex items-center justify-between gap-2 text-sm text-slate-500"><span>Total billed</span><span className="rounded-xl bg-slate-100 p-2 text-slate-700"><FileText className="h-4 w-4" /></span></div>
+            <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">${formatAmount(totals.billed)}</p>
+            <p className="mt-1 text-xs text-slate-500">USDC across active invoices</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 shadow-card sm:p-5">
+            <div className="flex items-center justify-between gap-2 text-sm text-emerald-800"><span>Collected</span><span className="rounded-xl bg-white/80 p-2"><Wallet className="h-4 w-4" /></span></div>
+            <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-emerald-800 sm:text-3xl">${formatAmount(totals.collected)}</p>
+            <p className="mt-1 text-xs text-emerald-800/70">{paidRate.toFixed(1)}% of billed fees</p>
+          </div>
+          <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 shadow-card sm:p-5">
+            <div className="flex items-center justify-between gap-2 text-sm text-amber-900"><span>Outstanding</span><span className="rounded-xl bg-white/80 p-2"><Clock3 className="h-4 w-4" /></span></div>
+            <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-amber-900 sm:text-3xl">${formatAmount(totals.outstanding)}</p>
+            <p className="mt-1 text-xs text-amber-900/70">Awaiting payment or settlement</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-5">
+            <div className="flex items-center justify-between gap-2 text-sm text-slate-500"><span>Invoices</span><span className="rounded-xl bg-teal-50 p-2 text-brand-700"><Activity className="h-4 w-4" /></span></div>
+            <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{counts.All ?? 0}</p>
+            <p className="mt-1 text-xs text-slate-500">{counts.Paid ?? 0} fully paid</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
+          <Card className="space-y-5">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-sm font-semibold text-ink">Collection overview</p><p className="mt-1 text-xs text-slate-500">Live breakdown from your invoice records</p></div>
+              <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-brand-800">USDC</span>
+            </div>
+            <div className="flex items-end justify-between gap-4">
+              <div><p className="text-3xl font-display font-semibold tracking-tight text-ink">{paidRate.toFixed(1)}%</p><p className="mt-1 text-xs text-slate-500">Collection rate</p></div>
+              <p className="text-right text-sm font-medium text-emerald-700">${formatAmount(totals.collected)} <span className="block text-xs font-normal text-slate-500">received</span></p>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`${paidRate.toFixed(1)} percent of billed fees collected`}>
+              <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(100, paidRate)}%` }} />
+            </div>
+            <div className="space-y-3">
+              {statusSummary.map((item) => (
+                <div key={item.label} className="flex items-center gap-3 text-sm">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.color}`} />
+                  <span className="w-24 text-slate-600">{item.label}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${item.color}`} style={{ width: `${counts.All ? (item.count / counts.All) * 100 : 0}%` }} /></div>
+                  <span className="w-8 text-right font-semibold tabular-nums text-ink">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-sm font-semibold text-ink">Recent invoices</p><p className="mt-1 text-xs text-slate-500">Latest records from the school office</p></div>
+              <span className="rounded-xl bg-slate-100 p-2 text-slate-600"><ArrowUpRight className="h-4 w-4" /></span>
+            </div>
+            {recentInvoices.length ? (
+              <ul className="divide-y divide-slate-100">
+                {recentInvoices.map((invoice) => (
+                  <li key={invoice.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                    <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{invoice.studentName}</p><p className="mt-1 truncate text-xs text-slate-500">{invoice.term} · {formatDate(invoice.createdAt)}</p></div>
+                    <div className="shrink-0 text-right"><p className="text-sm font-semibold tabular-nums text-ink">${formatAmount(invoice.amountBase)}</p><p className={clsx('mt-1 text-xs font-medium', invoice.status === 'Paid' ? 'text-emerald-700' : invoice.status === 'Overdue' ? 'text-rose-700' : 'text-slate-500')}>{invoice.status}</p></div>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">Your latest invoices will appear here.</p>}
+          </Card>
         </div>
 
         {created && (
