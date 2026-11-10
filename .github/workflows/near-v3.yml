@@ -39,7 +39,7 @@ jobs:
         with:
           workspaces: contracts/near-v3
       - name: Run v3 contract tests
-        run: cargo test --manifest-path contracts/near-v3/Cargo.toml
+        run: cargo test --manifest-path contracts/near-v3/Cargo.toml -- --test-threads=1
       - name: Upload resolved Cargo lockfile for review
         uses: actions/upload-artifact@v4
         with:
@@ -75,7 +75,7 @@ jobs:
           path: contracts/near-v3/target/near/**
           if-no-files-found: error
       - name: Run locked contract tests
-        run: cargo test --locked --manifest-path contracts/near-v3/Cargo.toml
+        run: cargo test --locked --manifest-path contracts/near-v3/Cargo.toml -- --test-threads=1
       - name: Trigger validation on the lockfile commit
         if: steps.lockfile.outputs.committed == 'true'
         env:
