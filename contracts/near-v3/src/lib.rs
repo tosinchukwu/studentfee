@@ -1544,6 +1544,77 @@ mod tests {
     }
 
     #[test]
+    fn callback_requires_exact_invoice_attempt_operation_and_status_and_is_single_use() {
+        let (mut contract, _, _) = funded_contract();
+        context("anyone.testnet", 4, None);
+        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        context("registry.testnet", 5, Some(PromiseResult::Successful(vec![])));
+
+        assert!(!contract.on_transfer_complete("ffffffffffffffffffffffffffffffff".to_string(), 1, OperationType::Settle));
+        assert!(!contract.on_transfer_complete(INVOICE_ID.to_string(), 2, OperationType::Settle));
+        assert!(!contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Refund));
+        let mut invoice = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        invoice.status = InvoiceStatus::PaymentReceived;
+        contract.invoices.insert(&INVOICE_ID.to_string(), &invoice);
+        assert!(!contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+        invoice.status = InvoiceStatus::Settling;
+        contract.invoices.insert(&INVOICE_ID.to_string(), &invoice);
+
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+        assert!(!contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Paid);
+        assert_eq!(contract.fees_available, FEE);
+        assert_eq!(contract.settling_gross, 0);
+    }
+
+    #[test]
+    fn recovered_refund_can_only_restart_to_the_original_payer() {
+        let (mut contract, _, _) = funded_contract();
+        contract.fees_available = GROSS;
+        context("school.testnet", 4, None);
+        let _refund = contract.refund_payment(INVOICE_ID.to_string());
+
+        context("owner.testnet", 4 + WAIT_NS, None);
+        contract.retry_with_collateral(INVOICE_ID.to_string(), "refund callback missing".to_string());
+        let recovered = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(recovered.status, InvoiceStatus::RefundRecovered);
+        assert_eq!(recovered.operation_type, Some(OperationType::Refund));
+        assert_eq!(recovered.operation_recipient, Some(account("parent.testnet")));
+        assert_eq!(recovered.operation_amount, GROSS);
+        assert_eq!(contract.fees_available, 0);
+        assert_eq!(contract.lifetime_collateral, GROSS);
+
+        context("school.testnet", 4 + 2 * WAIT_NS, None);
+        let wrong_direction = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.refund_payment(INVOICE_ID.to_string());
+        }));
+        assert!(wrong_direction.is_err());
+        let wrong_restart = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.restart_settlement(INVOICE_ID.to_string());
+        }));
+        assert!(wrong_restart.is_err());
+        let cancel = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.cancel_invoice(INVOICE_ID.to_string());
+        }));
+        assert!(cancel.is_err());
+
+        context("school.testnet", 4 + 2 * WAIT_NS, None);
+        let _restart = contract.restart_refund(INVOICE_ID.to_string());
+        let restarting = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(restarting.status, InvoiceStatus::Refunding);
+        assert_eq!(restarting.operation_recipient, Some(account("parent.testnet")));
+        assert_eq!(restarting.operation_amount, GROSS);
+        assert_eq!(restarting.attempt_counter, 3);
+
+        context("registry.testnet", 4 + 2 * WAIT_NS + 1, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 3, OperationType::Refund));
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Refunded);
+        assert_eq!(contract.refunding_gross, 0);
+        assert_eq!(contract.held, 0);
+        assert_eq!(contract.lifetime_collateral, GROSS);
+    }
+
+    #[test]
     fn refunded_invoice_rejects_a_second_payment() {
         let (mut contract, _, _) = funded_contract();
         context("school.testnet", 4, None);
