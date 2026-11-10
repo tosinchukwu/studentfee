@@ -16,6 +16,10 @@ Implementation is in progress. This package is **not deployable or approved for 
 - Treasury change delay: 24 hours.
 - Frozen-operation and restart delay: 10 minutes.
 - Platform fee treasury starts unset; fee withdrawals remain disabled until verified.
+- Owner, school administrators, school treasuries and platform treasury are separate roles; treasury accounts cannot register as school administrators or become owner.
+- A single pending treasury change is allowed per school; asynchronous callbacks are checked against the queued treasury state.
+- A 0.1 NEAR free-balance floor is enforced before contract-initiated asynchronous transfers. The floor is provisional until testnet gas measurements are completed.
+- The reserve calculation subtracts both storage-locked NEAR and outstanding prepaid school-storage liabilities.
 
 ## Build and tests
 
