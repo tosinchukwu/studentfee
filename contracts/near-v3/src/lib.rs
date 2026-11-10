@@ -1430,10 +1430,10 @@ mod tests {
         assert_eq!(contract.get_school_invoices(SECOND_SCHOOL.to_string(), 0, 100).len(), 1);
 
         context("anyone.testnet", 6, None);
-        let _settle = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
         assert_ledger_invariants(&contract);
         context("other-school.testnet", 7, None);
-        let _refund = contract.refund_payment(SECOND_INVOICE.to_string());
+        drop(contract.refund_payment(SECOND_INVOICE.to_string()));
         assert_ledger_invariants(&contract);
 
         context("registry.testnet", 8, Some(PromiseResult::Successful(vec![])));
@@ -1444,7 +1444,7 @@ mod tests {
         contract.platform_treasury = Some(account("platform-treasury.testnet"));
         contract.platform_treasury_verified = true;
         context("owner.testnet", 9, None);
-        let _withdrawal = contract.withdraw_fees(U128(FEE));
+        drop(contract.withdraw_fees(U128(FEE)));
         assert_ledger_invariants(&contract);
         assert_eq!(contract.fees_in_flight, FEE);
         context("registry.testnet", 10, Some(PromiseResult::Successful(vec![])));
@@ -1482,7 +1482,7 @@ mod tests {
     fn platform_treasury_verification_is_single_flight_and_stale_safe() {
         let (mut contract, _, _) = funded_contract();
         context("owner.testnet", 4, None);
-        let _first = contract.set_platform_treasury(account("platform-treasury.testnet"));
+        drop(contract.set_platform_treasury(account("platform-treasury.testnet")));
         assert_eq!(contract.pending_platform_treasury, Some(account("platform-treasury.testnet")));
         let second = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             contract.set_platform_treasury(account("other-platform-treasury.testnet"));
@@ -1496,7 +1496,7 @@ mod tests {
         assert_eq!(contract.platform_treasury, None);
 
         context("owner.testnet", 6 + WAIT_NS, None);
-        let _second_attempt = contract.set_platform_treasury(account("platform-treasury.testnet"));
+        drop(contract.set_platform_treasury(account("platform-treasury.testnet")));
         let balance = StorageBalance { total: U128(1), available: U128(0) };
         let result = near_sdk::serde_json::to_vec(&Some(balance)).unwrap();
         context("registry.testnet", 7 + WAIT_NS, Some(PromiseResult::Successful(result.clone())));
@@ -1524,13 +1524,13 @@ mod tests {
         assert!(before_approval.is_err());
 
         context("owner.testnet", 5, None);
-        let _failed_check = contract.approve_school(SCHOOL_ID.to_string(), 500);
+        drop(contract.approve_school(SCHOOL_ID.to_string(), 500));
         context("registry.testnet", 6, Some(PromiseResult::Failed));
         assert!(!contract.on_approval_treasury_check(SCHOOL_ID.to_string(), 500, account("treasury.testnet"), 1));
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::PendingApproval);
 
         context("owner.testnet", 7, None);
-        let _cancelled_approval = contract.approve_school(SCHOOL_ID.to_string(), 500);
+        drop(contract.approve_school(SCHOOL_ID.to_string(), 500));
         context("owner.testnet", 7 + WAIT_NS, None);
         contract.cancel_school_approval(SCHOOL_ID.to_string());
         let balance = StorageBalance { total: U128(1), available: U128(0) };
@@ -1540,7 +1540,7 @@ mod tests {
         assert!(!contract.schools.get(&SCHOOL_ID.to_string()).unwrap().approval_pending);
 
         context("owner.testnet", 9 + WAIT_NS, None);
-        let _approval = contract.approve_school(SCHOOL_ID.to_string(), 500);
+        drop(contract.approve_school(SCHOOL_ID.to_string(), 500));
         context("registry.testnet", 10 + WAIT_NS, Some(PromiseResult::Successful(result.clone())));
         assert!(!contract.on_approval_treasury_check(SCHOOL_ID.to_string(), 100, account("treasury.testnet"), 2));
         assert!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().approval_pending);
@@ -1569,11 +1569,11 @@ mod tests {
             .attached_deposit(NearToken::from_yoctonear(deposit));
         testing_env!(builder.build());
 
-        let _promise = contract.register_school(
+        drop(contract.register_school(
             "New School".to_string(),
             "Registration test".to_string(),
             account("new-treasury.testnet"),
-        );
+        ));
         let school_id = "00000000000000000000000000000000".to_string();
         let school = contract.schools.get(&school_id).unwrap();
         assert!(school.registration_storage_cost > 0);
@@ -1595,11 +1595,11 @@ mod tests {
             .prepaid_gas(Gas::from_tgas(300))
             .attached_deposit(NearToken::from_yoctonear(deposit));
         testing_env!(second_builder.build());
-        let _second_promise = contract.register_school(
+        drop(contract.register_school(
             "Second School".to_string(),
             "Successful registration".to_string(),
             account("second-treasury.testnet"),
-        );
+        ));
         let second_id = "00000000000000000000000000000001".to_string();
         let storage_balance = StorageBalance { total: U128(deposit), available: U128(0) };
         let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
@@ -1631,11 +1631,11 @@ mod tests {
             .prepaid_gas(Gas::from_tgas(300))
             .attached_deposit(NearToken::from_yoctonear(deposit));
         testing_env!(builder.build());
-        let _registration = contract.register_school(
+        drop(contract.register_school(
             "Pending School".to_string(),
             "No treasury callback".to_string(),
             account("pending-treasury.testnet"),
-        );
+        ));
         let school_id = "00000000000000000000000000000000".to_string();
         context("owner.testnet", 3, None);
         let too_early = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1665,7 +1665,7 @@ mod tests {
         contract.schools.insert(&SCHOOL_ID.to_string(), &school);
 
         context("owner.testnet", 4, None);
-        let _promise = contract.reactivate_school(SCHOOL_ID.to_string());
+        drop(contract.reactivate_school(SCHOOL_ID.to_string()));
         assert!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().reactivation_pending);
         let duplicate = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             contract.reactivate_school(SCHOOL_ID.to_string());
@@ -1686,7 +1686,7 @@ mod tests {
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().status, SchoolStatus::Suspended);
 
         context("owner.testnet", 8, None);
-        let _second = contract.reactivate_school(SCHOOL_ID.to_string());
+        drop(contract.reactivate_school(SCHOOL_ID.to_string()));
         context("owner.testnet", 8 + WAIT_NS, None);
         contract.cancel_reactivation(SCHOOL_ID.to_string());
         assert!(!contract.schools.get(&SCHOOL_ID.to_string()).unwrap().reactivation_pending);
@@ -1701,7 +1701,7 @@ mod tests {
         contract.treasury_index.insert(&school.treasury, &SCHOOL_ID.to_string());
         contract.schools.insert(&SCHOOL_ID.to_string(), &school);
         context("owner.testnet", 10 + WAIT_NS, None);
-        let _third = contract.reactivate_school(SCHOOL_ID.to_string());
+        drop(contract.reactivate_school(SCHOOL_ID.to_string()));
         context("registry.testnet", 11 + WAIT_NS, Some(PromiseResult::Successful(result.clone())));
         assert!(!contract.on_reactivate_school_check(SCHOOL_ID.to_string(), account("treasury.testnet"), 2));
         assert!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().reactivation_pending);
@@ -1779,7 +1779,7 @@ mod tests {
         let amount = 250_000_000_000_000_000_000_000u128;
         let before = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance;
         context("school.testnet", 4, None);
-        let _promise = contract.withdraw_storage(SCHOOL_ID.to_string(), U128(amount));
+        drop(contract.withdraw_storage(SCHOOL_ID.to_string(), U128(amount)));
         let after_start = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance;
         assert_eq!(after_start, before - amount);
         assert_eq!(contract.prepaid_storage_total, after_start);
@@ -1827,7 +1827,7 @@ mod tests {
         let amount = 250_000_000_000_000_000_000_000u128;
         let before = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance;
         context("school.testnet", 4, None);
-        let _promise = contract.withdraw_storage(SCHOOL_ID.to_string(), U128(amount));
+        drop(contract.withdraw_storage(SCHOOL_ID.to_string(), U128(amount)));
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance, before - amount);
 
         context("owner.testnet", 4 + WAIT_NS, None);
@@ -1862,7 +1862,7 @@ mod tests {
     fn treasury_change_rechecks_registration_after_delay_and_ignores_stale_callbacks() {
         let (mut contract, _, _) = funded_contract();
         context("school.testnet", 4, None);
-        let _cancelled_check = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        drop(contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
         context("school.testnet", 5, None);
         contract.cancel_treasury_change(SCHOOL_ID.to_string());
         let storage_balance = StorageBalance { total: U128(1), available: U128(0) };
@@ -1872,14 +1872,14 @@ mod tests {
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().queued_treasury, None);
 
         context("school.testnet", 7, None);
-        let _failed_check = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        drop(contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
         context("registry.testnet", 8, Some(PromiseResult::Failed));
         assert!(!contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 3));
         let after_failure = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
         assert_eq!(after_failure.queued_treasury, None);
 
         context("school.testnet", 9, None);
-        let _queue = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        drop(contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
         context("registry.testnet", 10, Some(PromiseResult::Successful(result.clone())));
         assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 4));
         let queued = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
@@ -1887,13 +1887,13 @@ mod tests {
         assert_eq!(effective, 10 + TREASURY_DELAY_NS);
 
         context("school.testnet", effective, None);
-        let _apply = contract.apply_treasury_change(SCHOOL_ID.to_string());
+        drop(contract.apply_treasury_change(SCHOOL_ID.to_string()));
 
         // Cancel and requeue the same destination while the old apply callback is in flight.
         context("school.testnet", effective + 1, None);
         contract.cancel_treasury_change(SCHOOL_ID.to_string());
         context("school.testnet", effective + 2, None);
-        let _requeue = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        drop(contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
         context("registry.testnet", effective + 3, Some(PromiseResult::Successful(result.clone())));
         assert!(!contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 4));
         assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 6));
@@ -1906,7 +1906,7 @@ mod tests {
         assert_eq!(still_queued.treasury_effective_at, Some(new_effective));
 
         context("school.testnet", new_effective, None);
-        let _new_apply = contract.apply_treasury_change(SCHOOL_ID.to_string());
+        drop(contract.apply_treasury_change(SCHOOL_ID.to_string()));
         context("registry.testnet", new_effective + 1, Some(PromiseResult::Successful(result)));
         assert!(contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 6));
         let changed = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
@@ -1923,7 +1923,7 @@ mod tests {
     fn only_one_treasury_change_can_be_pending_at_a_time() {
         let (mut contract, _, _) = funded_contract();
         context("school.testnet", 4, None);
-        let _first = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        drop(contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
         let second = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             contract.queue_treasury_change(SCHOOL_ID.to_string(), account("another-treasury.testnet"));
         }));
@@ -2018,7 +2018,7 @@ mod tests {
         assert!(reuse_cancelled.is_err());
 
         context("anyone.testnet", 5, None);
-        let _settle = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
         context("registry.testnet", 6, Some(PromiseResult::Successful(vec![])));
         assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
         context("school.testnet", 7, None);
@@ -2033,7 +2033,7 @@ mod tests {
         assert_eq!(contract.invoices.get(&NEW_ID.to_string()).unwrap().status, InvoiceStatus::PaymentReceived);
         context("school.testnet", 9, None);
         assert_eq!(contract.invoices.get(&NEW_ID.to_string()).unwrap().status, InvoiceStatus::PaymentReceived);
-        let _refund = contract.refund_payment(NEW_ID.to_string());
+        drop(contract.refund_payment(NEW_ID.to_string()));
         context("registry.testnet", 10, Some(PromiseResult::Successful(vec![])));
         assert!(contract.on_transfer_complete(NEW_ID.to_string(), 1, OperationType::Refund));
         context("school.testnet", 11, None);
@@ -2057,7 +2057,7 @@ mod tests {
         contract.accept_admin(SCHOOL_ID.to_string());
 
         context("replacement-admin.testnet", 7, None);
-        let _queue = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        drop(contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
         let storage_balance = StorageBalance { total: U128(1), available: U128(0) };
         let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
         context("registry.testnet", 8, Some(PromiseResult::Successful(result.clone())));
@@ -2065,12 +2065,12 @@ mod tests {
         let effective = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().treasury_effective_at.unwrap();
 
         context("replacement-admin.testnet", effective, None);
-        let _apply = contract.apply_treasury_change(SCHOOL_ID.to_string());
+        drop(contract.apply_treasury_change(SCHOOL_ID.to_string()));
         context("registry.testnet", effective + 1, Some(PromiseResult::Successful(result)));
         assert!(contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 1));
 
         context("anyone.testnet", effective + 2, None);
-        let _settlement = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
         let settling = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
         assert_eq!(settling.operation_recipient, Some(account("treasury.testnet")));
         assert_eq!(settling.operation_amount, NET);
@@ -2148,7 +2148,7 @@ mod tests {
 
         context("school.testnet", 7, None);
         contract.cancel_invoice(OTHER_PENDING_ID.to_string());
-        let _refund = contract.refund_payment(INVOICE_ID.to_string());
+        drop(contract.refund_payment(INVOICE_ID.to_string()));
         assert_eq!(contract.invoices.get(&OTHER_PENDING_ID.to_string()).unwrap().status, InvoiceStatus::Cancelled);
         assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::Refunding);
         context("registry.testnet", 8, Some(PromiseResult::Successful(vec![])));
@@ -2205,7 +2205,7 @@ mod tests {
         contract.platform_treasury = Some(account("platform-treasury.testnet"));
         contract.platform_treasury_verified = true;
         context("owner.testnet", 4, None);
-        let _withdrawal = contract.withdraw_fees(U128(FEE));
+        drop(contract.withdraw_fees(U128(FEE)));
         let withdrawal = near_sdk::serde_json::to_value(contract.get_withdrawal(0).unwrap()).unwrap();
         assert!(withdrawal["amount"].is_string());
         assert!(withdrawal["started_at"].is_string());
@@ -2246,7 +2246,7 @@ mod tests {
     fn successful_settlement_credits_only_the_snapshotted_fee() {
         let (mut contract, _, _) = funded_contract();
         context("anyone.testnet", 4, None);
-        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
         let settling = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
         assert_eq!(settling.status, InvoiceStatus::Settling);
         assert_eq!(settling.operation_recipient, Some(account("treasury.testnet")));
@@ -2271,7 +2271,7 @@ mod tests {
     fn failed_settlement_returns_to_payment_received_and_can_be_refunded() {
         let (mut contract, _, admin) = funded_contract();
         context("anyone.testnet", 4, None);
-        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
         context("registry.testnet", 5, Some(PromiseResult::Failed));
         assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
         let invoice = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
@@ -2283,7 +2283,7 @@ mod tests {
         assert_eq!(contract.settling_fee, 0);
 
         context("school.testnet", 6, None);
-        let _refund = contract.refund_payment(INVOICE_ID.to_string());
+        drop(contract.refund_payment(INVOICE_ID.to_string()));
         let refunding = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
         assert_eq!(refunding.status, InvoiceStatus::Refunding);
         assert_eq!(refunding.operation_recipient, Some(account("parent.testnet")));
@@ -2303,7 +2303,7 @@ mod tests {
     fn callback_requires_exact_invoice_attempt_operation_and_status_and_is_single_use() {
         let (mut contract, _, _) = funded_contract();
         context("anyone.testnet", 4, None);
-        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
         context("registry.testnet", 5, Some(PromiseResult::Successful(vec![])));
 
         assert!(!contract.on_transfer_complete("ffffffffffffffffffffffffffffffff".to_string(), 1, OperationType::Settle));
@@ -2328,7 +2328,7 @@ mod tests {
         let (mut contract, _, _) = funded_contract();
         contract.fees_available = GROSS;
         context("school.testnet", 4, None);
-        let _refund = contract.refund_payment(INVOICE_ID.to_string());
+        drop(contract.refund_payment(INVOICE_ID.to_string()));
 
         context("owner.testnet", 4 + WAIT_NS, None);
         contract.retry_with_collateral(INVOICE_ID.to_string(), "refund callback missing".to_string());
@@ -2374,7 +2374,7 @@ mod tests {
     fn refunded_invoice_rejects_a_second_payment() {
         let (mut contract, _, _) = funded_contract();
         context("school.testnet", 4, None);
-        let _refund = contract.refund_payment(INVOICE_ID.to_string());
+        drop(contract.refund_payment(INVOICE_ID.to_string()));
         context("registry.testnet", 5, Some(PromiseResult::Successful(vec![])));
         assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Refund));
         context("usdc.testnet", 6, None);
@@ -2389,7 +2389,7 @@ mod tests {
         let (mut contract, owner, admin) = funded_contract();
         contract.fees_available = 200_000_000;
         context("anyone.testnet", 4, None);
-        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
 
         context("owner.testnet", 4 + WAIT_NS, None);
         contract.retry_with_collateral(INVOICE_ID.to_string(), "explorer checked".to_string());
@@ -2485,7 +2485,7 @@ mod tests {
         let (mut contract, _, _) = funded_contract();
         contract.fees_available = 2 * NET;
         context("anyone.testnet", 4, None);
-        let _first = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
 
         context("owner.testnet", 4 + WAIT_NS, None);
         contract.retry_with_collateral(INVOICE_ID.to_string(), "first recovery".to_string());
@@ -2530,7 +2530,7 @@ mod tests {
     fn collateral_recovery_and_close_are_owner_only_and_use_platform_fees() {
         let (mut contract, _, _) = funded_contract();
         context("anyone.testnet", 4, None);
-        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
         contract.fees_available = NET - 1;
 
         context("school.testnet", 4 + WAIT_NS, None);
@@ -2574,7 +2574,7 @@ mod tests {
     fn close_as_sent_handles_frozen_and_recovered_refunds_without_releasing_school_funds() {
         let (mut frozen, _, _) = funded_contract();
         context("school.testnet", 4, None);
-        let _refund = frozen.refund_payment(INVOICE_ID.to_string());
+        drop(frozen.refund_payment(INVOICE_ID.to_string()));
         context("owner.testnet", 4 + WAIT_NS, None);
         frozen.close_as_sent(INVOICE_ID.to_string(), "refund receipt checked".to_string());
         let closed_frozen = frozen.invoices.get(&INVOICE_ID.to_string()).unwrap();
@@ -2589,7 +2589,7 @@ mod tests {
         let (mut recovered, _, _) = funded_contract();
         recovered.fees_available = GROSS;
         context("school.testnet", 4, None);
-        let _refund_again = recovered.refund_payment(INVOICE_ID.to_string());
+        drop(recovered.refund_payment(INVOICE_ID.to_string()));
         context("owner.testnet", 4 + WAIT_NS, None);
         recovered.retry_with_collateral(INVOICE_ID.to_string(), "refund collateral".to_string());
         assert_eq!(recovered.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::RefundRecovered);
@@ -2608,7 +2608,7 @@ mod tests {
     fn disabling_collateral_recovery_keeps_frozen_invoice_closeable() {
         let (mut contract, _, _) = funded_contract();
         context("anyone.testnet", 4, None);
-        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
         contract.allow_retry = false;
         context("owner.testnet", 4 + WAIT_NS, None);
         let retry = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -2663,7 +2663,7 @@ mod tests {
     fn fee_withdrawal_uses_only_available_fees_and_restores_confirmed_failures() {
         let (mut contract, owner, _) = funded_contract();
         context("anyone.testnet", 4, None);
-        let _settlement = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
         context("registry.testnet", 5, Some(PromiseResult::Successful(vec![])));
         assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
         assert_eq!(contract.fees_available, FEE);
@@ -2671,7 +2671,7 @@ mod tests {
         contract.platform_treasury = Some(account("platform-treasury.testnet"));
         contract.platform_treasury_verified = true;
         context("owner.testnet", 6, None);
-        let _withdrawal = contract.withdraw_fees(U128(FEE));
+        drop(contract.withdraw_fees(U128(FEE)));
         assert_eq!(contract.fees_available, 0);
         assert_eq!(contract.fees_in_flight, FEE);
 
@@ -2708,7 +2708,7 @@ mod tests {
     fn stale_callback_cannot_change_a_closed_invoice() {
         let (mut contract, _, _) = funded_contract();
         context("anyone.testnet", 4, None);
-        let _promise = contract.settle_invoice(INVOICE_ID.to_string());
+        drop(contract.settle_invoice(INVOICE_ID.to_string()));
         context("owner.testnet", 4 + WAIT_NS, None);
         contract.close_as_sent(INVOICE_ID.to_string(), "explorer confirms transfer".to_string());
         let before = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
