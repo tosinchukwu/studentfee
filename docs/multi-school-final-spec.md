@@ -21,7 +21,7 @@ All limits are for testnet and must be reviewed before any mainnet use. This doc
 
 | Setting | Value |
 |---|---|
-| Platform owner | `mouseng20.testnet`, after signed-message ownership verification (section 11). Never a school administrator |
+| Platform owner | `mouseng20.testnet`, after signed-message ownership verification (section 11). Never a school administrator or school/platform treasury |
 | v3 demo school administrator | A different account from the owner |
 | Platform fee treasury | A separate dedicated account. **Name still pending. Not invented here.** `withdraw_fees` stays disabled until the owner sets and verifies it |
 | Default platform fee | 1% (100 bps). Cap 5% (500 bps) |
@@ -33,6 +33,8 @@ All limits are for testnet and must be reviewed before any mainnet use. This doc
 | Collateral-backed recoveries per invoice | At most 2 |
 | Lifetime collateral commitment, global | At most 1,000 USDC (`max_lifetime_collateral`). Monotonic, never replenished |
 | Automatic settlement service | Built only after the contract passes the testnet integration tests (section 12) |
+| Minimum call gas | 70 Tgas for an asynchronous call plus callback (provisional; verify against measured worst-case gas) |
+| Free NEAR reserve | 0.1 NEAR above storage-locked balance and prepaid school-storage liabilities (provisional; verify on testnet) |
 | Upgradeable | No |
 
 ## 2. Statuses and lifecycle
@@ -66,7 +68,7 @@ Consequences of `Refunded` being terminal: another payment needs a new invoice w
 
 ## 3. Data model
 
-School: `school_id`, `name` (80), `description` (200), `admin`, `treasury`, `status` (`PendingApproval`, `Active`, `Suspended`), `treasury_verified`, `fee_bps`, `storage_balance`, `created_at`, queued treasury change (`new_treasury`, `effective_at`). A unique `admin` to `school_id` index gives one school per administrator.
+School: `school_id`, `name` (80), `description` (200), `admin`, `treasury`, `status` (`PendingApproval`, `Active`, `Suspended`), `treasury_verified`, `fee_bps`, `storage_balance`, `created_at`, queued treasury change (`new_treasury`, `effective_at`). A unique `admin` to `school_id` index gives one school per administrator. Owner, school administrators, school treasuries and the platform-fee treasury are mutually distinct roles. Pending registration and treasury changes are guarded against overlapping asynchronous callbacks.
 
 Invoice:
 - Identity: `invoice_id` (32 lowercase hex, globally unique, never reused), `school_id`, `amount` (gross, at most 1,000 USDC), `due_date` (ms), `status`, `fee_bps` snapshot taken at creation.
@@ -319,7 +321,7 @@ Absolute restrictions:
 - Both are deliberate trade-offs: liveness for one invoice against the safety of every other school's funds.
 
 ## 10. Storage
-`1250000000000000000000` yoctoNEAR equals 0.00125 NEAR (1 NEAR = 10^24 yoctoNEAR). That is the token's registration minimum, read live, paid once per account to the token. NEAR charges 10^19 yoctoNEAR per stored byte. School and invoice records are charged at their measured size (from `env::storage_usage()` in tests, roughly a few thousandths of a NEAR each as an estimate) against the school's prepaid storage balance. The registry keeps enough NEAR for its own storage and refuses new operations when its free balance is below the reserve.
+`1250000000000000000000` yoctoNEAR equals 0.00125 NEAR (1 NEAR = 10^24 yoctoNEAR). That is the token's registration minimum, read live, paid once per account to the token. NEAR charges 10^19 yoctoNEAR per stored byte. School registration records and invoice records are charged at their measured size (from `env::storage_usage()`) against the school's prepaid storage balance. The registry tracks aggregate prepaid storage liabilities separately from storage-locked NEAR, and refuses asynchronous calls unless at least 0.1 NEAR remains free and the caller supplies at least 70 Tgas. Both thresholds are provisional until testnet gas and storage measurements are recorded.
 
 ## 11. Owner verification
 Before deployment, `mouseng20.testnet` proves control by signing in through the app's signed-message check, which also confirms the signing key is a full-access key. The contract is initialized with that account as owner only after this succeeds. The owner cannot be a school administrator, so the v3 demo school uses a different account. Testnet accepts a single key. Mainnet requires a multisig owner, decided separately.
