@@ -20,6 +20,7 @@ const TREASURY_DELAY_NS: u64 = 24 * 60 * 60 * 1_000_000_000;
 const FT_GAS: Gas = Gas::from_tgas(15);
 const CALLBACK_GAS: Gas = Gas::from_tgas(25);
 const MIN_CALL_GAS: Gas = Gas::from_tgas(70);
+const MIN_FREE_NEAR_RESERVE: u128 = 100_000_000_000_000_000_000_000; // 0.1 NEAR, testnet floor; gas must be measured before deployment
 const MAX_EVIDENCE: usize = 500;
 const MAX_NAME: usize = 80;
 const MAX_DESCRIPTION: usize = 200;
@@ -304,6 +305,7 @@ impl Contract {
 
     #[payable]
     pub fn register_school(&mut self, name: String, description: String, treasury: AccountId) -> Promise {
+        self.ensure_free_near_reserve();
         let admin = env::predecessor_account_id();
         require!(admin != self.owner, "Owner cannot be a school administrator");
         require!(self.admin_index.get(&admin).is_none(), "Administrator already owns a school");
@@ -365,6 +367,7 @@ impl Contract {
 
     pub fn approve_school(&mut self, school_id: String, fee_bps: u16) -> Promise {
         self.assert_owner();
+        self.ensure_free_near_reserve();
         require!(fee_bps <= MAX_FEE_BPS, "Platform fee exceeds 5%");
         let school = self.schools.get(&school_id).expect("School not found");
         require!(school.status == SchoolStatus::PendingApproval, "School is not awaiting approval");
@@ -401,6 +404,7 @@ impl Contract {
 
     pub fn reactivate_school(&mut self, school_id: String) -> Promise {
         self.assert_owner();
+        self.ensure_free_near_reserve();
         let school = self.schools.get(&school_id).expect("School not found");
         require!(school.status == SchoolStatus::Suspended, "School is not suspended");
         ext_ft::ext(self.usdc_token.clone())
@@ -434,6 +438,8 @@ impl Contract {
         self.assert_owner();
         require!(new_owner != self.owner && new_owner != env::current_account_id(), "Invalid owner");
         require!(self.admin_index.get(&new_owner).is_none(), "A school administrator cannot become owner");
+        require!(self.treasury_index.get(&new_owner).is_none(), "A school treasury cannot become owner");
+        require!(self.platform_treasury.as_ref() != Some(&new_owner), "Platform treasury cannot become owner");
         self.proposed_owner = Some(new_owner);
     }
 
@@ -441,6 +447,8 @@ impl Contract {
         let caller = env::predecessor_account_id();
         require!(self.proposed_owner.as_ref() == Some(&caller), "Not the proposed owner");
         require!(self.admin_index.get(&caller).is_none(), "A school administrator cannot become owner");
+        require!(self.treasury_index.get(&caller).is_none(), "A school treasury cannot become owner");
+        require!(self.platform_treasury.as_ref() != Some(&caller), "Platform treasury cannot become owner");
         self.owner = caller;
         self.proposed_owner = None;
     }
@@ -449,6 +457,7 @@ impl Contract {
         let mut school = self.get_admin_school(&school_id);
         require!(new_admin != self.owner && new_admin != env::current_account_id(), "Invalid school administrator");
         require!(self.treasury_index.get(&new_admin).is_none(), "A treasury account cannot become an administrator");
+        require!(self.platform_treasury.as_ref() != Some(&new_admin), "Platform treasury cannot become a school administrator");
         require!(new_admin != school.admin, "Already the school administrator");
         require!(self.admin_index.get(&new_admin).is_none(), "Account already administers a school");
         school.proposed_admin = Some(new_admin);
@@ -461,6 +470,7 @@ impl Contract {
         require!(school.proposed_admin.as_ref() == Some(&caller), "Not the proposed administrator");
         require!(caller != self.owner && self.admin_index.get(&caller).is_none(), "Administrator is unavailable");
         require!(self.treasury_index.get(&caller).is_none(), "A treasury account cannot become an administrator");
+        require!(self.platform_treasury.as_ref() != Some(&caller), "Platform treasury cannot become a school administrator");
         self.admin_index.remove(&school.admin);
         school.admin = caller.clone();
         school.proposed_admin = None;
@@ -469,6 +479,7 @@ impl Contract {
     }
 
     pub fn queue_treasury_change(&mut self, school_id: String, new_treasury: AccountId) -> Promise {
+        self.ensure_free_near_reserve();
         let school = self.get_admin_school(&school_id);
         require!(new_treasury != school.treasury, "Treasury is unchanged");
         require!(new_treasury != school.admin && new_treasury != self.owner && new_treasury != env::current_account_id(), "Treasury must be a separate account");
@@ -731,6 +742,7 @@ impl Contract {
 
     pub fn set_platform_treasury(&mut self, account_id: AccountId) -> Promise {
         self.assert_owner();
+        self.ensure_free_near_reserve();
         require!(account_id != self.owner && account_id != env::current_account_id(), "Platform treasury must be a separate account");
         require!(self.admin_index.get(&account_id).is_none(), "A school administrator cannot be the platform treasury");
         require!(self.treasury_index.get(&account_id).is_none(), "A school treasury cannot be the platform treasury");
@@ -743,7 +755,7 @@ impl Contract {
 
     #[private]
     pub fn on_platform_treasury_check(&mut self, account_id: AccountId) -> bool {
-        if !Self::storage_balance_result() || self.admin_index.get(&account_id).is_some() || self.treasury_index.get(&account_id).is_some() { return false; }
+        if !Self::storage_balance_result() || account_id == self.owner || self.admin_index.get(&account_id).is_some() || self.treasury_index.get(&account_id).is_some() { return false; }
         self.platform_treasury = Some(account_id);
         self.platform_treasury_verified = true;
         true
@@ -751,6 +763,7 @@ impl Contract {
 
     pub fn withdraw_fees(&mut self, amount: U128) -> Promise {
         self.assert_owner();
+        self.ensure_free_near_reserve();
         require!(!self.paused, "Contract is paused");
         require!(amount.0 > 0 && amount.0 <= self.fees_available, "Amount exceeds available platform fees");
         require!(self.platform_treasury_verified, "Platform treasury is not configured and verified");
@@ -850,6 +863,7 @@ impl Contract {
     // ----- Internal helpers -----
 
     fn start_invoice_transfer(&mut self, mut invoice: Invoice, operation: OperationType, recovered: bool) -> Promise {
+        self.ensure_free_near_reserve();
         require!(env::prepaid_gas() >= MIN_CALL_GAS, "Attach more gas for transfer and callback");
         let now = env::block_timestamp();
         if recovered {
@@ -982,6 +996,14 @@ impl Contract {
         if caller != self.owner {
             self.assert_school_admin(school_id);
         }
+    }
+
+    fn ensure_free_near_reserve(&self) {
+        let storage_required = (env::storage_usage() as u128)
+            .checked_mul(env::storage_byte_cost().as_yoctonear())
+            .expect("Storage reserve calculation overflow");
+        let free = env::account_balance().as_yoctonear().checked_sub(storage_required).unwrap_or(0);
+        require!(free >= MIN_FREE_NEAR_RESERVE, "Registry NEAR reserve is below 0.1 NEAR");
     }
 
     fn assert_owner(&self) { require!(env::predecessor_account_id() == self.owner, "Only the platform owner"); }
