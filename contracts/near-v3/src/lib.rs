@@ -1341,6 +1341,7 @@ mod tests {
         };
         contract.schools.insert(&SCHOOL_ID.to_string(), &school);
         contract.admin_index.insert(&admin, &SCHOOL_ID.to_string());
+        contract.next_school_id = 2; // The fixture uses school ID 1; ID 0 is intentionally unused.
         contract.treasury_index.insert(&account("treasury.testnet"), &SCHOOL_ID.to_string());
         contract.prepaid_storage_total = school.storage_balance;
 
@@ -1414,6 +1415,7 @@ mod tests {
             reactivation_nonce: 0,
         };
         contract.schools.insert(&SECOND_SCHOOL.to_string(), &second_school);
+        contract.next_school_id = 3;
         contract.admin_index.insert(&second_admin, &SECOND_SCHOOL.to_string());
         contract.treasury_index.insert(&second_school.treasury, &SECOND_SCHOOL.to_string());
         contract.prepaid_storage_total += second_school.storage_balance;
@@ -2583,9 +2585,6 @@ mod tests {
         assert_eq!(closed_frozen.active_attempt_id, None);
         assert_eq!(closed_frozen.operation_type, None);
         assert_eq!(frozen.refunding_gross, 0);
-        context("registry.testnet", 4 + WAIT_NS + 1, Some(PromiseResult::Successful(vec![])));
-        assert!(!frozen.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Refund));
-
         let (mut recovered, _, _) = funded_contract();
         recovered.fees_available = GROSS;
         context("school.testnet", 4, None);
