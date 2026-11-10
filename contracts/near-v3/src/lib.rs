@@ -1480,6 +1480,73 @@ mod tests {
     }
 
     #[test]
+    fn receiver_rejects_unknown_wrong_token_duplicate_and_suspended_school_payments() {
+        let (mut contract, _, _) = funded_contract();
+        const PENDING_ID: &str = "abcdef0123456789abcdef0123456789";
+        context("school.testnet", 4, None);
+        contract.create_invoice(SCHOOL_ID.to_string(), PENDING_ID.to_string(), U128(GROSS), 0);
+
+        let snapshot_before = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        context("fake-token.testnet", 5, None);
+        let wrong_token = contract.ft_on_transfer(account("parent-two.testnet"), U128(GROSS), PENDING_ID.to_string());
+        assert!(matches!(wrong_token, PromiseOrValue::Value(value) if value.0 == GROSS));
+
+        context("usdc.testnet", 6, None);
+        let unknown = contract.ft_on_transfer(account("parent-two.testnet"), U128(GROSS), "unknown".to_string());
+        assert!(matches!(unknown, PromiseOrValue::Value(value) if value.0 == GROSS));
+        let duplicate = contract.ft_on_transfer(account("parent-two.testnet"), U128(GROSS), INVOICE_ID.to_string());
+        assert!(matches!(duplicate, PromiseOrValue::Value(value) if value.0 == GROSS));
+        let snapshot_after = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(snapshot_after.payer, snapshot_before.payer);
+        assert_eq!(snapshot_after.treasury_snapshot, snapshot_before.treasury_snapshot);
+        assert_eq!(snapshot_after.paid_at, snapshot_before.paid_at);
+        assert_eq!(contract.held, GROSS);
+
+        context("owner.testnet", 7, None);
+        contract.suspend_school(SCHOOL_ID.to_string());
+        context("usdc.testnet", 8, None);
+        let suspended = contract.ft_on_transfer(account("parent-two.testnet"), U128(GROSS), PENDING_ID.to_string());
+        assert!(matches!(suspended, PromiseOrValue::Value(value) if value.0 == GROSS));
+        assert_eq!(contract.invoices.get(&PENDING_ID.to_string()).unwrap().status, InvoiceStatus::Pending);
+        assert_eq!(contract.held, GROSS);
+    }
+
+    #[test]
+    fn invoice_ids_remain_reserved_after_paid_cancelled_and_refunded_states() {
+        let (mut contract, _, _) = funded_contract();
+        const CANCELLED_ID: &str = "abcdef0123456789abcdef0123456789";
+        const NEW_ID: &str = "fedcba9876543210fedcba9876543210";
+        context("school.testnet", 4, None);
+        contract.create_invoice(SCHOOL_ID.to_string(), CANCELLED_ID.to_string(), U128(GROSS), 0);
+        contract.cancel_invoice(CANCELLED_ID.to_string());
+        contract.create_invoice(SCHOOL_ID.to_string(), NEW_ID.to_string(), U128(GROSS), 0);
+
+        let reuse_cancelled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.create_invoice(SCHOOL_ID.to_string(), CANCELLED_ID.to_string(), U128(GROSS), 0);
+        }));
+        assert!(reuse_cancelled.is_err());
+
+        context("anyone.testnet", 5, None);
+        let _settle = contract.settle_invoice(INVOICE_ID.to_string());
+        context("registry.testnet", 6, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+        context("school.testnet", 7, None);
+        let reuse_paid = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.create_invoice(SCHOOL_ID.to_string(), INVOICE_ID.to_string(), U128(GROSS), 0);
+        }));
+        assert!(reuse_paid.is_err());
+
+        let _refund = contract.refund_payment(NEW_ID.to_string());
+        context("registry.testnet", 8, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(NEW_ID.to_string(), 1, OperationType::Refund));
+        context("school.testnet", 9, None);
+        let reuse_refunded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.create_invoice(SCHOOL_ID.to_string(), NEW_ID.to_string(), U128(GROSS), 0);
+        }));
+        assert!(reuse_refunded.is_err());
+    }
+
+    #[test]
     fn fee_rate_changes_apply_only_to_invoices_created_after_the_change() {
         let (mut contract, _, _) = funded_contract();
         context("owner.testnet", 4, None);
