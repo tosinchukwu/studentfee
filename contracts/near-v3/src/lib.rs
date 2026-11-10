@@ -1436,6 +1436,22 @@ mod tests {
         assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::PaymentReceived);
         assert_eq!(contract.held, GROSS);
         assert_eq!(contract.settling_gross, 0);
+
+        let mut low_gas = VMContextBuilder::new();
+        low_gas
+            .current_account_id(account("registry.testnet"))
+            .predecessor_account_id(account("anyone.testnet"))
+            .block_timestamp(5)
+            .account_balance(NearToken::from_near(10))
+            .prepaid_gas(Gas::from_tgas(50))
+            .attached_deposit(NearToken::from_yoctonear(0));
+        testing_env!(low_gas.build());
+        let gas_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.settle_invoice(INVOICE_ID.to_string());
+        }));
+        assert!(gas_result.is_err());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::PaymentReceived);
+        assert_eq!(contract.held, GROSS);
     }
 
     #[test]
