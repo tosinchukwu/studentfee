@@ -1916,6 +1916,56 @@ mod tests {
     }
 
     #[test]
+    fn paid_invoice_snapshots_survive_fee_admin_and_treasury_changes() {
+        let (mut contract, _, _) = funded_contract();
+        let original = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+
+        context("owner.testnet", 4, None);
+        contract.set_school_fee(SCHOOL_ID.to_string(), 500);
+        context("school.testnet", 5, None);
+        let new_admin = account("replacement-admin.testnet");
+        contract.propose_admin(SCHOOL_ID.to_string(), new_admin.clone());
+        context("replacement-admin.testnet", 6, None);
+        contract.accept_admin(SCHOOL_ID.to_string());
+
+        context("replacement-admin.testnet", 7, None);
+        let _queue = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        let storage_balance = StorageBalance { total: U128(1), available: U128(0) };
+        let result = near_sdk::serde_json::to_vec(&Some(storage_balance)).unwrap();
+        context("registry.testnet", 8, Some(PromiseResult::Successful(result.clone())));
+        assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        let effective = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().treasury_effective_at.unwrap();
+
+        context("replacement-admin.testnet", effective, None);
+        let _apply = contract.apply_treasury_change(SCHOOL_ID.to_string());
+        context("registry.testnet", effective + 1, Some(PromiseResult::Successful(result)));
+        assert!(contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+
+        context("anyone.testnet", effective + 2, None);
+        let _settlement = contract.settle_invoice(INVOICE_ID.to_string());
+        let settling = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        assert_eq!(settling.operation_recipient, Some(account("treasury.testnet")));
+        assert_eq!(settling.operation_amount, NET);
+        context("registry.testnet", effective + 3, Some(PromiseResult::Successful(vec![])));
+        assert!(contract.on_transfer_complete(INVOICE_ID.to_string(), 1, OperationType::Settle));
+
+        let paid = contract.invoices.get(&INVOICE_ID.to_string()).unwrap();
+        let school = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        assert_eq!(school.admin, new_admin);
+        assert_eq!(school.treasury, account("new-treasury.testnet"));
+        assert_eq!(school.fee_bps, 500);
+        assert_eq!(paid.status, InvoiceStatus::Paid);
+        assert_eq!(paid.payer, original.payer);
+        assert_eq!(paid.treasury_snapshot, original.treasury_snapshot);
+        assert_eq!(paid.amount, original.amount);
+        assert_eq!(paid.fee_bps, original.fee_bps);
+        assert_eq!(paid.fee_amount, original.fee_amount);
+        assert_eq!(paid.net_amount, original.net_amount);
+        assert_eq!(paid.paid_at, original.paid_at);
+        assert_eq!(contract.fees_available, FEE);
+    }
+
+    #[test]
     fn fee_rate_changes_apply_only_to_invoices_created_after_the_change() {
         let (mut contract, _, _) = funded_contract();
         context("owner.testnet", 4, None);
