@@ -33,5 +33,11 @@ jobs:
           workspaces: contracts/near-v3
       - name: Run v3 contract tests
         run: cargo test --manifest-path contracts/near-v3/Cargo.toml
+      - name: Upload resolved Cargo lockfile for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: near-v3-cargo-lock
+          path: contracts/near-v3/Cargo.lock
+          if-no-files-found: error
       - name: Compile v3 WebAssembly target
         run: cargo build --manifest-path contracts/near-v3/Cargo.toml --target wasm32-unknown-unknown --release
