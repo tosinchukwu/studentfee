@@ -1095,7 +1095,7 @@ mod tests {
             status: SchoolStatus::Active,
             treasury_verified: true,
             fee_bps: DEFAULT_FEE_BPS,
-            storage_balance: 10_000_000_000_000_000_000_000_000,
+            storage_balance: 1_000_000_000_000_000_000_000_000,
             created_at: 1,
             queued_treasury: None,
             treasury_effective_at: None,
@@ -1103,6 +1103,8 @@ mod tests {
         };
         contract.schools.insert(&SCHOOL_ID.to_string(), &school);
         contract.admin_index.insert(&admin, &SCHOOL_ID.to_string());
+        contract.treasury_index.insert(&account("treasury.testnet"), &SCHOOL_ID.to_string());
+        contract.prepaid_storage_total = school.storage_balance;
 
         context("school.testnet", 2, None);
         contract.create_invoice(SCHOOL_ID.to_string(), INVOICE_ID.to_string(), U128(GROSS), 0);
@@ -1111,6 +1113,62 @@ mod tests {
         let accepted = contract.ft_on_transfer(account("parent.testnet"), U128(GROSS), INVOICE_ID.to_string());
         assert!(matches!(accepted, PromiseOrValue::Value(value) if value.0 == 0));
         (contract, owner, admin)
+    }
+
+    #[test]
+    fn owner_cannot_become_a_school_or_platform_treasury() {
+        let (mut contract, _, _) = funded_contract();
+        context("owner.testnet", 4, None);
+        let school_treasury = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.propose_owner(account("treasury.testnet"));
+        }));
+        assert!(school_treasury.is_err());
+        contract.platform_treasury = Some(account("platform-treasury.testnet"));
+        let platform_treasury = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.propose_owner(account("platform-treasury.testnet"));
+        }));
+        assert!(platform_treasury.is_err());
+        assert_eq!(contract.owner, account("owner.testnet"));
+        assert_eq!(contract.proposed_owner, None);
+    }
+
+    #[test]
+    fn school_and_platform_treasuries_cannot_become_school_admins() {
+        let (mut contract, _, _) = funded_contract();
+        context("school.testnet", 4, None);
+        let school_treasury = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.propose_admin(SCHOOL_ID.to_string(), account("treasury.testnet"));
+        }));
+        assert!(school_treasury.is_err());
+
+        contract.platform_treasury = Some(account("platform-treasury.testnet"));
+        contract.platform_treasury_verified = true;
+        let platform_treasury = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.propose_admin(SCHOOL_ID.to_string(), account("platform-treasury.testnet"));
+        }));
+        assert!(platform_treasury.is_err());
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().proposed_admin, None);
+    }
+
+    #[test]
+    fn low_free_near_reserve_rejects_transfer_before_ledger_changes() {
+        let (mut contract, _, _) = funded_contract();
+        let mut builder = VMContextBuilder::new();
+        builder
+            .current_account_id(account("registry.testnet"))
+            .predecessor_account_id(account("anyone.testnet"))
+            .block_timestamp(4)
+            .account_balance(NearToken::from_yoctonear(MIN_FREE_NEAR_RESERVE / 2))
+            .prepaid_gas(Gas::from_tgas(300))
+            .attached_deposit(NearToken::from_yoctonear(0));
+        testing_env!(builder.build());
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            contract.settle_invoice(INVOICE_ID.to_string());
+        }));
+        assert!(result.is_err());
+        assert_eq!(contract.invoices.get(&INVOICE_ID.to_string()).unwrap().status, InvoiceStatus::PaymentReceived);
+        assert_eq!(contract.held, GROSS);
+        assert_eq!(contract.settling_gross, 0);
     }
 
     #[test]
@@ -1291,6 +1349,8 @@ mod tests {
         };
         contract.schools.insert(&other_school.school_id, &other_school);
         contract.admin_index.insert(&other_admin, &other_school.school_id);
+        contract.treasury_index.insert(&other_school.treasury, &other_school.school_id);
+        contract.prepaid_storage_total += other_school.storage_balance;
         context("other-school.testnet", 4, None);
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             contract.cancel_invoice(INVOICE_ID.to_string());
