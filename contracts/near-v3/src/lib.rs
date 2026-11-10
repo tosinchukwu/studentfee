@@ -505,10 +505,20 @@ impl Contract {
 
     #[private]
     pub fn on_queue_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool {
-        if !Self::storage_balance_result() { return false; }
-        if self.treasury_index.get(&new_treasury).is_some() || self.platform_treasury.as_ref() == Some(&new_treasury) || self.admin_index.get(&new_treasury).is_some() { return false; }
         if let Some(mut school) = self.schools.get(&school_id) {
-            school.queued_treasury = Some(new_treasury);
+            if school.queued_treasury.as_ref() != Some(&new_treasury) || school.treasury_effective_at.is_some() {
+                return false;
+            }
+            let available = Self::storage_balance_result()
+                && self.treasury_index.get(&new_treasury).is_none()
+                && self.platform_treasury.as_ref() != Some(&new_treasury)
+                && self.admin_index.get(&new_treasury).is_none();
+            if !available {
+                school.queued_treasury = None;
+                school.treasury_effective_at = None;
+                self.schools.insert(&school_id, &school);
+                return false;
+            }
             school.treasury_effective_at = Some(env::block_timestamp().saturating_add(TREASURY_DELAY_NS));
             self.schools.insert(&school_id, &school);
             true
