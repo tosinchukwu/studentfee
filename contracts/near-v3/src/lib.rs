@@ -25,6 +25,7 @@ const MAX_NAME: usize = 80;
 const MAX_DESCRIPTION: usize = 200;
 
 #[derive(BorshSerialize, BorshStorageKey)]
+#[borsh(crate = "near_sdk::borsh")]
 enum StorageKey {
     Schools,
     Invoices,
@@ -35,7 +36,7 @@ enum StorageKey {
 }
 
 #[near(serializers = [json, borsh])]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum InvoiceStatus {
     Pending,
     PaymentReceived,
@@ -110,7 +111,7 @@ pub struct Invoice {
 #[derive(Clone)]
 pub struct Withdrawal {
     pub withdrawal_id: u64,
-    pub amount: U128,
+    pub amount: u128,
     pub recipient: AccountId,
     pub started_at: u64,
     pub active: bool,
@@ -228,6 +229,9 @@ trait ExtFt {
 #[ext_contract(ext_self)]
 trait ExtSelf {
     fn on_school_treasury_check(&mut self, school_id: String, admin: AccountId) -> bool;
+    fn on_queue_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool;
+    fn on_apply_treasury_check(&mut self, school_id: String, new_treasury: AccountId) -> bool;
+    fn on_reactivate_school_check(&mut self, school_id: String) -> bool;
     fn on_approval_treasury_check(&mut self, school_id: String, fee_bps: u16) -> bool;
     fn on_platform_treasury_check(&mut self, account_id: AccountId) -> bool;
     fn on_transfer_complete(&mut self, invoice_id: String, attempt_id: u64, operation: OperationType) -> bool;
@@ -371,6 +375,7 @@ impl Contract {
             if school.status != SchoolStatus::PendingApproval { return false; }
             school.status = SchoolStatus::Active;
             school.treasury_verified = true;
+            school.fee_bps = fee_bps;
             self.schools.insert(&school_id, &school);
             env::log_str(&format!("SCHOOL_ACTIVATED:{}", school_id));
             true
@@ -729,7 +734,7 @@ impl Contract {
         self.next_withdrawal_id = self.next_withdrawal_id.checked_add(1).expect("Withdrawal id overflow");
         let withdrawal = Withdrawal {
             withdrawal_id: id,
-            amount,
+            amount: amount.0,
             recipient: recipient.clone(),
             started_at: env::block_timestamp(),
             active: true,
@@ -749,9 +754,9 @@ impl Contract {
         let Some(withdrawal) = self.withdrawals.get(&withdrawal_id) else { return false; };
         if !withdrawal.active { return false; }
         self.withdrawals.remove(&withdrawal_id);
-        self.fees_in_flight = self.fees_in_flight.checked_sub(withdrawal.amount.0).expect("Ledger underflow");
+        self.fees_in_flight = self.fees_in_flight.checked_sub(withdrawal.amount).expect("Ledger underflow");
         if !matches!(env::promise_result(0), PromiseResult::Successful(_)) {
-            self.fees_available = self.fees_available.checked_add(withdrawal.amount.0).expect("Fee overflow");
+            self.fees_available = self.fees_available.checked_add(withdrawal.amount).expect("Fee overflow");
         }
         true
     }
@@ -762,7 +767,7 @@ impl Contract {
         require!(withdrawal.active, "Withdrawal is already finalized");
         require!(env::block_timestamp() >= withdrawal.started_at.saturating_add(WAIT_NS), "Withdrawal wait has not elapsed");
         self.withdrawals.remove(&withdrawal_id);
-        self.fees_in_flight -= withdrawal.amount.0;
+        self.fees_in_flight -= withdrawal.amount;
         env::log_str(&format!("FEE_WITHDRAWAL_FINALIZED:{}", withdrawal_id));
     }
 
@@ -862,7 +867,7 @@ impl Contract {
         ext_ft::ext(self.usdc_token.clone())
             .with_attached_deposit(NearToken::from_yoctonear(1))
             .with_static_gas(FT_GAS)
-            .ft_transfer(recipient, amount, Some(format!("StudentFee v3 invoice {}", invoice_id)))
+            .ft_transfer(recipient, U128(amount), Some(format!("StudentFee v3 invoice {}", invoice_id)))
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
                 .on_transfer_complete(invoice_id, attempt_id, operation))
     }
@@ -984,7 +989,6 @@ impl FungibleTokenReceiver for Contract {
         invoice.status = InvoiceStatus::PaymentReceived;
         self.held = self.held.checked_add(amount.0).expect("Ledger overflow");
         self.invoices.insert(&msg, &invoice);
-        school.storage_balance = U128(school.storage_balance.0); // Keep school record canonical; snapshot is in invoice.
         PromiseOrValue::Value(U128(0))
     }
 }
