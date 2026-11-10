@@ -988,12 +988,15 @@ impl Contract {
     pub fn get_invoice(&self, invoice_id: String) -> Option<InvoiceView> { self.invoices.get(&invoice_id).map(Into::into) }
     pub fn get_school_for_admin(&self, admin: AccountId) -> Option<String> { self.admin_index.get(&admin) }
     pub fn get_schools(&self, from_index: u64, limit: u64) -> Vec<SchoolView> {
-        let start = usize::try_from(from_index).unwrap_or(usize::MAX);
-        self.schools.iter().skip(start).take(limit.min(100) as usize).map(|(_, school)| school.into()).collect()
+        let end = from_index.saturating_add(limit.min(100)).min(self.next_school_id);
+        (from_index..end)
+            .filter_map(|index| self.schools.get(&format!("{:032x}", index)).map(Into::into))
+            .collect()
     }
     pub fn get_school_invoice_ids(&self, school_id: String, from_index: u64, limit: u64) -> Vec<String> {
-        let start = usize::try_from(from_index).unwrap_or(usize::MAX);
-        self.school_invoice_ids.get(&school_id).map(|ids| ids.iter().skip(start).take(limit.min(100) as usize).collect()).unwrap_or_default()
+        let Some(ids) = self.school_invoice_ids.get(&school_id) else { return Vec::new(); };
+        let end = from_index.saturating_add(limit.min(100)).min(ids.len());
+        (from_index..end).filter_map(|index| ids.get(index)).collect()
     }
     pub fn get_school_invoices(&self, school_id: String, from_index: u64, limit: u64) -> Vec<InvoiceView> {
         self.get_school_invoice_ids(school_id, from_index, limit).into_iter().filter_map(|id| self.invoices.get(&id).map(Into::into)).collect()
