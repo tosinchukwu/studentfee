@@ -84,6 +84,8 @@ pub struct School {
     pub queued_treasury: Option<AccountId>,
     pub treasury_effective_at: Option<u64>,
     pub proposed_admin: Option<AccountId>,
+    pub reactivation_pending: bool,
+    pub reactivation_started_at: Option<u64>,
 }
 
 #[near(serializers = [json, borsh])]
@@ -145,6 +147,8 @@ pub struct SchoolView {
     pub queued_treasury: Option<AccountId>,
     pub treasury_effective_at: Option<u64>,
     pub proposed_admin: Option<AccountId>,
+    pub reactivation_pending: bool,
+    pub reactivation_started_at: Option<u64>,
 }
 
 impl From<School> for SchoolView {
@@ -155,7 +159,8 @@ impl From<School> for SchoolView {
             treasury_verified: s.treasury_verified, fee_bps: s.fee_bps,
             storage_balance: U128(s.storage_balance), created_at: s.created_at,
             queued_treasury: s.queued_treasury, treasury_effective_at: s.treasury_effective_at,
-            proposed_admin: s.proposed_admin,
+            proposed_admin: s.proposed_admin, reactivation_pending: s.reactivation_pending,
+            reactivation_started_at: s.reactivation_started_at,
         }
     }
 }
@@ -352,6 +357,8 @@ impl Contract {
             queued_treasury: None,
             treasury_effective_at: None,
             proposed_admin: None,
+            reactivation_pending: false,
+            reactivation_started_at: None,
         };
         let before = env::storage_usage();
         self.schools.insert(&school_id, &school);
@@ -1162,6 +1169,8 @@ mod tests {
             queued_treasury: None,
             treasury_effective_at: None,
             proposed_admin: None,
+            reactivation_pending: false,
+            reactivation_started_at: None,
         };
         contract.schools.insert(&SCHOOL_ID.to_string(), &school);
         contract.admin_index.insert(&admin, &SCHOOL_ID.to_string());
