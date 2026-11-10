@@ -1521,6 +1521,7 @@ mod tests {
             account("pending-treasury.testnet"),
         );
         let school_id = "00000000000000000000000000000000".to_string();
+        context("owner.testnet", 3, None);
         let too_early = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             contract.cancel_school_registration(school_id.clone());
         }));
