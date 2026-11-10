@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { GraduationCap, Loader2, ShieldCheck } from 'lucide-react'
+import { GraduationCap, Home, Loader2, ShieldCheck } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Link } from '../lib/router'
 import { STATUS_STYLES } from '../lib/format'
