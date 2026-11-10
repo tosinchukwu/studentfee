@@ -438,7 +438,8 @@ impl Contract {
                 && !self.has_queued_treasury(&school.treasury, Some(&school_id))
                 && self.admin_index.get(&school.treasury).is_none()
                 && !self.has_proposed_admin(&school.treasury)
-                && self.proposed_owner.as_ref() != Some(&school.treasury);
+                && self.proposed_owner.as_ref() != Some(&school.treasury)
+                && school.treasury != self.owner;
             if !registered || !treasury_available || school.admin != admin {
                 self.schools.remove(&school_id);
                 self.admin_index.remove(&admin);
@@ -583,7 +584,7 @@ impl Contract {
         self.assert_owner();
         require!(new_owner != self.owner && new_owner != env::current_account_id() && new_owner != self.usdc_token, "Invalid owner");
         require!(self.admin_index.get(&new_owner).is_none() && !self.has_proposed_admin(&new_owner), "A school administrator cannot become owner");
-        require!(self.treasury_index.get(&new_owner).is_none() && !self.has_queued_treasury(&new_owner, None), "A school treasury cannot become owner");
+        require!(self.treasury_index.get(&new_owner).is_none() && !self.has_queued_treasury(&new_owner, None) && !self.has_pending_registration_treasury(&new_owner), "A school treasury cannot become owner");
         require!(self.pending_platform_treasury.as_ref() != Some(&new_owner), "A pending platform treasury cannot become owner");
         require!(self.platform_treasury.as_ref() != Some(&new_owner), "Platform treasury cannot become owner");
         self.proposed_owner = Some(new_owner);
@@ -594,7 +595,7 @@ impl Contract {
         require!(self.proposed_owner.as_ref() == Some(&caller), "Not the proposed owner");
         require!(caller != self.usdc_token, "USDC token cannot become owner");
         require!(self.admin_index.get(&caller).is_none() && !self.has_proposed_admin(&caller), "A school administrator cannot become owner");
-        require!(self.treasury_index.get(&caller).is_none() && !self.has_queued_treasury(&caller, None), "A school treasury cannot become owner");
+        require!(self.treasury_index.get(&caller).is_none() && !self.has_queued_treasury(&caller, None) && !self.has_pending_registration_treasury(&caller), "A school treasury cannot become owner");
         require!(self.pending_platform_treasury.as_ref() != Some(&caller), "A pending platform treasury cannot become owner");
         require!(self.platform_treasury.as_ref() != Some(&caller), "Platform treasury cannot become owner");
         self.owner = caller;
@@ -1236,6 +1237,10 @@ impl Contract {
     // Reserve destinations as soon as a role change is proposed or queued.
     fn has_proposed_admin(&self, account: &AccountId) -> bool {
         self.schools.iter().any(|(_, school)| school.proposed_admin.as_ref() == Some(account))
+    }
+
+    fn has_pending_registration_treasury(&self, account: &AccountId) -> bool {
+        self.schools.iter().any(|(_, school)| !school.treasury_verified && school.treasury == *account)
     }
 
     fn has_queued_treasury(&self, account: &AccountId, except_school: Option<&str>) -> bool {
