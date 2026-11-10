@@ -1,6 +1,6 @@
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::{
-    env, ext_contract, near, require,
+    env, ext_contract, init, near, payable, private, require,
     json_types::U128,
     AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue,
     PromiseResult,
