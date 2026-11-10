@@ -401,7 +401,7 @@ export default function AdminPage() {
           </Card>
         </div>
 
-        <Card id="analytics-chart" className="space-y-5">
+        <div id="analytics-chart"><Card className="space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div><p className="font-display text-lg font-semibold text-ink">Collection trend</p><p className="mt-1 text-xs text-slate-500">Confirmed paid invoices · last six months</p></div>
             <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-semibold text-brand-800">USDC · on-chain paid</span>
@@ -422,7 +422,7 @@ export default function AdminPage() {
             })}
           </div>
           <p className="text-xs text-slate-500">Only invoices marked Paid by the deployed contract are counted. This chart is based on the invoice history currently available to this school account.</p>
-        </Card>
+        </Card></div>
 
         {created && (
           <Notice tone="info">
@@ -474,7 +474,7 @@ export default function AdminPage() {
         {invoices === null || !near.config ? (
           <Spinner label="Loading invoices" />
         ) : (
-          <div id="payments"><InvoiceList invoices={visible} config={near.config} busyId={busyId} linksReady={shareBase !== null} onAction={(a, i) => void onAction(a, i)} />
+          <div id="payments"><InvoiceList invoices={visible} config={near.config} busyId={busyId} linksReady={shareBase !== null} onAction={(a, i) => void onAction(a, i)} /></div>
         )}
       </div>
     </AdminWorkspace>
