@@ -80,12 +80,12 @@ pub struct School {
     pub fee_bps: u16,
     pub storage_balance: u128,
     pub registration_storage_cost: u128,
-    pub created_at: u64,
+    pub created_at: U64,
     pub queued_treasury: Option<AccountId>,
-    pub treasury_effective_at: Option<u64>,
+    pub treasury_effective_at: Option<U64>,
     pub proposed_admin: Option<AccountId>,
     pub reactivation_pending: bool,
-    pub reactivation_started_at: Option<u64>,
+    pub reactivation_started_at: Option<U64>,
 }
 
 #[near(serializers = [json, borsh])]
@@ -94,23 +94,38 @@ pub struct Invoice {
     pub invoice_id: String,
     pub school_id: String,
     pub amount: u128,
-    pub due_date: u64,
+    pub due_date: U64,
     pub status: InvoiceStatus,
     pub fee_bps: u16,
     pub payer: Option<AccountId>,
     pub treasury_snapshot: Option<AccountId>,
     pub fee_amount: u128,
     pub net_amount: u128,
-    pub paid_at: Option<u64>,
+    pub paid_at: Option<U64>,
     pub attempt_counter: u64,
     pub active_attempt_id: Option<u64>,
     pub operation_type: Option<OperationType>,
     pub operation_recipient: Option<AccountId>,
     pub operation_amount: u128,
-    pub operation_started_at: Option<u64>,
+    pub operation_started_at: Option<U64>,
     pub operation_from_recovered: bool,
     pub recovery_count: u8,
-    pub recovered_at: Option<u64>,
+    pub recovered_at: Option<U64>,
+}
+
+#[near(serializers = [json])]
+pub struct WithdrawalView {
+    pub withdrawal_id: U64,
+    pub amount: U128,
+    pub recipient: AccountId,
+    pub started_at: U64,
+    pub active: bool,
+}
+
+impl From<Withdrawal> for WithdrawalView {
+    fn from(w: Withdrawal) -> Self {
+        Self { withdrawal_id: U64(w.withdrawal_id), amount: U128(w.amount), recipient: w.recipient, started_at: U64(w.started_at), active: w.active }
+    }
 }
 
 #[near(serializers = [json, borsh])]
@@ -158,10 +173,10 @@ impl From<School> for SchoolView {
             school_id: s.school_id, name: s.name, description: s.description,
             admin: s.admin, treasury: s.treasury, status: s.status,
             treasury_verified: s.treasury_verified, fee_bps: s.fee_bps,
-            storage_balance: U128(s.storage_balance), created_at: s.created_at,
-            queued_treasury: s.queued_treasury, treasury_effective_at: s.treasury_effective_at,
+            storage_balance: U128(s.storage_balance), created_at: U64(s.created_at),
+            queued_treasury: s.queued_treasury, treasury_effective_at: s.treasury_effective_at.map(U64),
             proposed_admin: s.proposed_admin, reactivation_pending: s.reactivation_pending,
-            reactivation_started_at: s.reactivation_started_at,
+            reactivation_started_at: s.reactivation_started_at.map(U64),
         }
     }
 }
@@ -194,13 +209,13 @@ impl From<Invoice> for InvoiceView {
     fn from(i: Invoice) -> Self {
         Self {
             invoice_id: i.invoice_id, school_id: i.school_id, amount: U128(i.amount),
-            due_date: i.due_date, status: i.status, fee_bps: i.fee_bps, payer: i.payer,
+            due_date: U64(i.due_date), status: i.status, fee_bps: i.fee_bps, payer: i.payer,
             treasury_snapshot: i.treasury_snapshot, fee_amount: U128(i.fee_amount),
-            net_amount: U128(i.net_amount), paid_at: i.paid_at, attempt_counter: i.attempt_counter,
+            net_amount: U128(i.net_amount), paid_at: i.paid_at.map(U64), attempt_counter: i.attempt_counter,
             active_attempt_id: i.active_attempt_id, operation_type: i.operation_type,
             operation_recipient: i.operation_recipient, operation_amount: U128(i.operation_amount),
-            operation_started_at: i.operation_started_at, operation_from_recovered: i.operation_from_recovered,
-            recovery_count: i.recovery_count, recovered_at: i.recovered_at,
+            operation_started_at: i.operation_started_at.map(U64), operation_from_recovered: i.operation_from_recovered,
+            recovery_count: i.recovery_count, recovered_at: i.recovered_at.map(U64),
         }
     }
 }
