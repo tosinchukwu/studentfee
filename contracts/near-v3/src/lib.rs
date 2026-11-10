@@ -1517,7 +1517,7 @@ mod tests {
         assert!(contract.on_platform_treasury_check(account("platform-treasury.testnet"), 3));
         assert_eq!(contract.platform_treasury, Some(account("platform-treasury.testnet")));
         assert_eq!(contract.pending_platform_treasury, None);
-        assert!(!contract.on_platform_treasury_check(account("platform-treasury.testnet")));
+        assert!(!contract.on_platform_treasury_check(account("platform-treasury.testnet"), 3));
         assert_eq!(contract.platform_treasury, Some(account("platform-treasury.testnet")));
     }
 
@@ -2054,7 +2054,7 @@ mod tests {
         context("replacement-admin.testnet", effective, None);
         let _apply = contract.apply_treasury_change(SCHOOL_ID.to_string());
         context("registry.testnet", effective + 1, Some(PromiseResult::Successful(result)));
-        assert!(contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet")));
+        assert!(contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 1));
 
         context("anyone.testnet", effective + 2, None);
         let _settlement = contract.settle_invoice(INVOICE_ID.to_string());
