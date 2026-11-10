@@ -267,6 +267,7 @@ pub struct Contract {
     fees_available: u128,       // FA
     fees_in_flight: u128,       // FW
     lifetime_collateral: u128,
+    prepaid_storage_total: u128,
 }
 
 #[near]
@@ -298,6 +299,7 @@ impl Contract {
             fees_available: 0,
             fees_in_flight: 0,
             lifetime_collateral: 0,
+            prepaid_storage_total: 0,
         }
     }
 
@@ -335,6 +337,7 @@ impl Contract {
         };
         self.schools.insert(&school_id, &school);
         self.admin_index.insert(&admin, &school_id);
+        self.prepaid_storage_total = self.prepaid_storage_total.checked_add(school.storage_balance).expect("Storage liability overflow");
         ext_ft::ext(self.usdc_token.clone())
             .with_static_gas(FT_GAS)
             .storage_balance_of(treasury)
@@ -352,6 +355,7 @@ impl Contract {
             if !registered || !treasury_available || school.admin != admin {
                 self.schools.remove(&school_id);
                 self.admin_index.remove(&admin);
+                self.prepaid_storage_total = self.prepaid_storage_total.checked_sub(school.storage_balance).expect("Storage liability underflow");
                 Promise::new(admin).transfer(NearToken::from_yoctonear(school.storage_balance));
                 env::log_str("SCHOOL_REGISTRATION_REJECTED_TREASURY_NOT_AVAILABLE");
                 return false;
@@ -506,6 +510,7 @@ impl Contract {
     }
 
     pub fn apply_treasury_change(&mut self, school_id: String) -> Promise {
+        self.ensure_free_near_reserve();
         let school = self.get_admin_school(&school_id);
         let new_treasury = school.queued_treasury.clone().expect("No treasury change queued");
         let effective = school.treasury_effective_at.expect("No effective time");
@@ -544,13 +549,16 @@ impl Contract {
         let amount = env::attached_deposit().as_yoctonear();
         require!(amount > 0, "Attach a storage deposit");
         school.storage_balance = school.storage_balance.checked_add(amount).expect("Storage balance overflow");
+        self.prepaid_storage_total = self.prepaid_storage_total.checked_add(amount).expect("Storage liability overflow");
         self.schools.insert(&school_id, &school);
     }
 
     pub fn withdraw_storage(&mut self, school_id: String, amount: U128) -> Promise {
+        self.ensure_free_near_reserve();
         let mut school = self.get_admin_school(&school_id);
         require!(amount.0 > 0 && amount.0 <= school.storage_balance, "Insufficient prepaid storage");
         school.storage_balance -= amount.0;
+        self.prepaid_storage_total = self.prepaid_storage_total.checked_sub(amount.0).expect("Storage liability underflow");
         let admin = school.admin.clone();
         self.schools.insert(&school_id, &school);
         Promise::new(admin).transfer(NearToken::from_yoctonear(amount.0))
@@ -563,6 +571,7 @@ impl Contract {
         if matches!(env::promise_result(0), PromiseResult::Successful(_)) { return true; }
         if let Some(mut school) = self.schools.get(&school_id) {
             school.storage_balance = school.storage_balance.checked_add(amount.0).expect("Storage balance overflow");
+            self.prepaid_storage_total = self.prepaid_storage_total.checked_add(amount.0).expect("Storage liability overflow");
             self.schools.insert(&school_id, &school);
             return true;
         }
@@ -610,6 +619,7 @@ impl Contract {
         let cost = bytes.checked_mul(env::storage_byte_cost().as_yoctonear()).expect("Storage cost overflow");
         require!(school.storage_balance >= cost, "School storage balance is insufficient");
         school.storage_balance -= cost;
+        self.prepaid_storage_total = self.prepaid_storage_total.checked_sub(cost).expect("Storage liability underflow");
         self.schools.insert(&school_id, &school);
     }
 
@@ -1002,7 +1012,8 @@ impl Contract {
         let storage_required = (env::storage_usage() as u128)
             .checked_mul(env::storage_byte_cost().as_yoctonear())
             .expect("Storage reserve calculation overflow");
-        let free = env::account_balance().as_yoctonear().checked_sub(storage_required).unwrap_or(0);
+        let committed = storage_required.checked_add(self.prepaid_storage_total).expect("NEAR reserve calculation overflow");
+        let free = env::account_balance().as_yoctonear().checked_sub(committed).unwrap_or(0);
         require!(free >= MIN_FREE_NEAR_RESERVE, "Registry NEAR reserve is below 0.1 NEAR");
     }
 
@@ -1060,6 +1071,7 @@ mod tests {
             .current_account_id(account("registry.testnet"))
             .predecessor_account_id(account(predecessor))
             .block_timestamp(timestamp)
+            .account_balance(NearToken::from_near(10))
             .prepaid_gas(Gas::from_tgas(300))
             .attached_deposit(NearToken::from_yoctonear(0));
         match result {
