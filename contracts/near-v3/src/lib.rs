@@ -337,7 +337,7 @@ impl Contract {
         require!(env::attached_deposit().as_yoctonear() > 0, "Prepaid storage deposit required");
         let school_id = format!("{:032x}", self.next_school_id);
         self.next_school_id = self.next_school_id.checked_add(1).expect("School id overflow");
-        let school = School {
+        let mut school = School {
             school_id: school_id.clone(),
             name,
             description,
