@@ -119,6 +119,7 @@ pub struct StorageWithdrawal {
     pub withdrawal_id: u64,
     pub school_id: String,
     pub amount: u128,
+    pub started_at: u64,
     pub active: bool,
 }
 
@@ -647,11 +648,21 @@ impl Contract {
         let admin = school.admin.clone();
         self.schools.insert(&school_id, &school);
         self.storage_withdrawals.insert(&id, &StorageWithdrawal {
-            withdrawal_id: id, school_id, amount: amount.0, active: true,
+            withdrawal_id: id, school_id, amount: amount.0, started_at: env::block_timestamp(), active: true,
         });
         Promise::new(admin).transfer(NearToken::from_yoctonear(amount.0))
             .then(ext_self::ext(env::current_account_id()).with_static_gas(CALLBACK_GAS)
                 .on_storage_withdrawal_complete(id))
+    }
+
+    pub fn finalize_storage_withdrawal_as_sent(&mut self, withdrawal_id: u64, evidence: String) {
+        self.assert_owner();
+        require!(evidence.len() <= MAX_EVIDENCE_BYTES, "Evidence note is too long");
+        let withdrawal = self.storage_withdrawals.get(&withdrawal_id).expect("Storage withdrawal not found");
+        require!(withdrawal.active, "Storage withdrawal is not active");
+        require!(env::block_timestamp() >= withdrawal.started_at.saturating_add(WAIT_NS), "Storage withdrawal recovery delay has not elapsed");
+        self.storage_withdrawals.remove(&withdrawal_id);
+        env::log_str(&format!("STORAGE_WITHDRAWAL_FINALIZED:{}:{}:{}", withdrawal_id, withdrawal.school_id, evidence));
     }
 
     #[private]
@@ -1620,6 +1631,25 @@ mod tests {
         context("replacement-admin.testnet", 7, None);
         contract.create_invoice(SCHOOL_ID.to_string(), "abcdef0123456789abcdef0123456789".to_string(), U128(GROSS), 0);
         assert_eq!(contract.invoices.get(&"abcdef0123456789abcdef0123456789".to_string()).unwrap().status, InvoiceStatus::Pending);
+    }
+
+    #[test]
+    fn stuck_storage_withdrawal_finalization_never_recredits_a_possible_payout() {
+        let (mut contract, _, _) = funded_contract();
+        let amount = 250_000_000_000_000_000_000_000u128;
+        let before = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance;
+        context("school.testnet", 4, None);
+        let _promise = contract.withdraw_storage(SCHOOL_ID.to_string(), U128(amount));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance, before - amount);
+
+        context("owner.testnet", 4 + WAIT_NS, None);
+        contract.finalize_storage_withdrawal_as_sent(0, "explorer checked".to_string());
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance, before - amount);
+        assert_eq!(contract.prepaid_storage_total, before - amount);
+
+        context("registry.testnet", 4 + WAIT_NS + 1, Some(PromiseResult::Failed));
+        assert!(!contract.on_storage_withdrawal_complete(0));
+        assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().storage_balance, before - amount);
     }
 
     #[test]
