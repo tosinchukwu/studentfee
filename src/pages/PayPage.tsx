@@ -7,7 +7,7 @@ import { formatDate, formatDateTime, shortHash, txUrl } from '../lib/format'
 import { formatAmount, toBaseUnits } from '../lib/money'
 import { ftBalanceOf } from '../lib/rpc'
 import { clientAdapter } from '../lib/contracts'
-import { friendlyError, useNear } from '../lib/near'
+import { friendlyError, useNear, isAndroid } from '../lib/near'
 import type { InvoiceView } from '../lib/types'
 import { Button, Card, Notice, PageShell, Spinner, StatusBadge } from '../components/ui'
 
@@ -240,6 +240,11 @@ export default function PayPage({ id }: { id: string }) {
                     {!busy && !accountId && <Wallet className="h-4 w-4" aria-hidden />}
                     {busy === 'paying' ? 'Confirm in your wallet...' : accountId ? `Pay $${formatAmount(invoice.amountBase)}` : 'Connect wallet to pay'}
                   </Button>
+                  {isAndroid && !accountId && (
+                    <button type="button" onClick={near.connectOther} className="min-h-[44px] w-full text-sm font-medium text-brand-700 underline">
+                      Use another wallet
+                    </button>
+                  )}
                   <p className="text-center text-xs text-slate-500">
                     {accountId
                       ? `Paying from ${accountId}${balance !== null ? ` · Balance $${formatAmount(balance)}` : ''}`

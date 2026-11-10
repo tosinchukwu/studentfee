@@ -32,7 +32,7 @@ Schools collect fees through cash, bank transfers and receipts that are matched 
 - PostgreSQL for invoice details, sessions and settings (Neon via the Vercel Marketplace)
 - NEAR Testnet contract `v2.studentfee.testnet` (Rust, deployed separately) for invoice amounts, status and settlement, behind a contract adapter per version
 - Testnet USDC (NEP-141 token, 6 decimals)
-- NEAR Wallet Selector (MyNearWallet, Meteor Wallet, HERE Wallet)
+- NEAR Wallet Selector (NEAR Mobile, MyNearWallet, Meteor Wallet, HERE Wallet). NEAR Mobile on Android is wired in but still to be verified on a device: see `docs/near-mobile.md`
 
 ## How to run / try the demo
 

@@ -1,9 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { setupWalletSelector, type WalletSelector } from '@near-wallet-selector/core'
+import { setupWalletSelector, type InjectedWallet, type WalletSelector } from '@near-wallet-selector/core'
 import { setupModal, type WalletSelectorModal } from '@near-wallet-selector/modal-ui'
 import { setupMyNearWallet } from '@near-wallet-selector/my-near-wallet'
 import { setupMeteorWallet } from '@near-wallet-selector/meteor-wallet'
 import { setupHereWallet } from '@near-wallet-selector/here-wallet'
+import { setupNearMobileWallet } from '@near-wallet-selector/near-mobile-wallet'
+import { toast } from 'sonner'
 import { actionCreators } from '@near-js/transactions'
 import '@near-wallet-selector/modal-ui/styles.css'
 import { api } from './api'
@@ -11,6 +13,21 @@ import type { PublicConfig } from './types'
 
 export const GAS_100_TGAS = 100_000_000_000_000n
 export const GAS_30_TGAS = 30_000_000_000_000n
+
+const NEAR_MOBILE_ID = 'near-mobile-wallet'
+
+/**
+ * Shown inside NEAR Mobile when the user approves a request. NEAR Mobile's relay rejects the whole
+ * request unless these are public https URLs, so on localhost or plain http we leave them out.
+ */
+function nearMobileMetadata() {
+  const { origin } = window.location
+  if (!/^https:\/\/[^/]+\.[^/]+/.test(origin)) return undefined
+  return { name: 'School Fee Payment Tracker', logoUrl: `${origin}/logo.svg`, url: origin }
+}
+
+/** True on Android phones and tablets, where NEAR Mobile is offered first. */
+export const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent)
 
 export interface SignedLogin {
   accountId: string
@@ -22,7 +39,10 @@ interface NearContextValue {
   config: PublicConfig | null
   loadError: string | null
   accountId: string | null
+  /** Opens the wallet list. On Android it goes straight to NEAR Mobile. */
   connect: () => void
+  /** Always opens the full wallet list (used by the "another wallet" link on Android). */
+  connectOther: () => void
   disconnect: () => Promise<void>
   /** Signs and sends one function call. Resolves with the transaction hash when the wallet reports it. */
   call: (input: {
@@ -67,7 +87,12 @@ export function NearProvider({ children }: { children: ReactNode }) {
         const cfg = await api.config()
         const selector = await setupWalletSelector({
           network: 'testnet',
-          modules: [setupMyNearWallet(), setupMeteorWallet(), setupHereWallet()],
+          modules: [
+            setupNearMobileWallet({ dAppMetadata: nearMobileMetadata() }),
+            setupMyNearWallet(),
+            setupMeteorWallet(),
+            setupHereWallet(),
+          ],
         })
         if (abort.signal.aborted) return
         selectorRef.current = selector
@@ -88,7 +113,25 @@ export function NearProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const connect = useCallback(() => modalRef.current?.show(), [])
+  const connectOther = useCallback(() => modalRef.current?.show(), [])
+
+  // On Android the NEAR Mobile app is the likely wallet, so skip the list and start its sign-in:
+  // the connection panel shows an Approve button that hands off to the app.
+  const connect = useCallback(() => {
+    const selector = selectorRef.current
+    const contractId = config?.contractId
+    if (!isAndroid || !selector || !contractId) {
+      connectOther()
+      return
+    }
+    void selector
+      .wallet<InjectedWallet>(NEAR_MOBILE_ID)
+      .then((wallet) => wallet.signIn({ contractId, methodNames: [] }))
+      .catch((error: unknown) => {
+        toast.error(friendlyError(error))
+        connectOther()
+      })
+  }, [config, connectOther])
 
   const disconnect = useCallback(async () => {
     const selector = selectorRef.current
@@ -119,8 +162,8 @@ export function NearProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ config, loadError, accountId, connect, disconnect, call, signLogin }),
-    [config, loadError, accountId, connect, disconnect, call, signLogin],
+    () => ({ config, loadError, accountId, connect, connectOther, disconnect, call, signLogin }),
+    [config, loadError, accountId, connect, connectOther, disconnect, call, signLogin],
   )
   return <NearContext.Provider value={value}>{children}</NearContext.Provider>
 }

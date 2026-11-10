@@ -6,7 +6,7 @@ import { ApiError, api, session } from '../lib/api'
 import { copyText } from '../lib/format'
 import { formatAmount } from '../lib/money'
 import { clientAdapter } from '../lib/contracts'
-import { friendlyError, useNear } from '../lib/near'
+import { friendlyError, isAndroid, useNear } from '../lib/near'
 import { getShareBase } from '../lib/share'
 import type { DisplayStatus, HealthReport, InvoiceView } from '../lib/types'
 import { Button, Card, Notice, PageShell, Spinner } from '../components/ui'
@@ -55,7 +55,14 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
         </Notice>
       )}
       {near.accountId === null ? (
-        <Button className="w-full" onClick={near.connect}>Connect school wallet</Button>
+        <>
+          <Button className="w-full" onClick={near.connect}>Connect school wallet</Button>
+          {isAndroid && (
+            <button type="button" onClick={near.connectOther} className="min-h-[44px] w-full text-sm font-medium text-brand-700 underline">
+              Use another wallet
+            </button>
+          )}
+        </>
       ) : wrongAccount ? (
         <Button className="w-full" variant="secondary" onClick={() => void near.disconnect()}>Use a different wallet</Button>
       ) : (
