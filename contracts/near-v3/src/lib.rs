@@ -2,12 +2,11 @@ use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::{
     env, ext_contract, near, require,
     json_types::U128,
-    near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue,
+    AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue,
     PromiseResult,
 };
 use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::serde::{Deserialize, Serialize};
 
 const BPS: u128 = 10_000;
 const DEFAULT_FEE_BPS: u16 = 100;
