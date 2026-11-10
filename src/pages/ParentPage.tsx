@@ -106,7 +106,7 @@ export default function ParentPage() {
         <section className="grid gap-4 sm:grid-cols-3" aria-label="Fee summary">
           <Card className="relative overflow-hidden">
             <div className="flex items-center justify-between gap-3">
-              <div><p className="text-sm font-medium text-slate-500">Open balance</p><p className="mt-2 font-display text-2xl font-semibold tabular-nums text-ink">${formatAmount(openBalance)}</p><p className="mt-1 text-xs text-slate-500">USDC · ${dueInvoices.length} invoice${dueInvoices.length === 1 ? "" : "s"} awaiting payment</p></div>
+              <div><p className="text-sm font-medium text-slate-500">Open balance</p><p className="mt-2 font-display text-2xl font-semibold tabular-nums text-ink">${formatAmount(openBalance)}</p><p className="mt-1 text-xs text-slate-500">USDC · {dueInvoices.length} invoice${dueInvoices.length === 1 ? "" : "s"} awaiting payment</p></div>
               <span className="rounded-2xl bg-amber-50 p-3 text-amber-700"><CircleDollarSign className="h-5 w-5" /></span>
             </div>
           </Card>
@@ -118,7 +118,7 @@ export default function ParentPage() {
           </Card>
           <Card>
             <div className="flex items-center justify-between gap-3">
-              <div><p className="text-sm font-medium text-slate-500">Paid to date</p><p className="mt-2 font-display text-2xl font-semibold tabular-nums text-emerald-700">${formatAmount(paidTotal)}</p><p className="mt-1 text-xs text-slate-500">${paidInvoices.length} confirmed payment${paidInvoices.length === 1 ? "" : "s"}</p></div>
+              <div><p className="text-sm font-medium text-slate-500">Paid to date</p><p className="mt-2 font-display text-2xl font-semibold tabular-nums text-emerald-700">${formatAmount(paidTotal)}</p><p className="mt-1 text-xs text-slate-500">{paidInvoices.length} confirmed payment${paidInvoices.length === 1 ? "" : "s"}</p></div>
               <span className="rounded-2xl bg-emerald-50 p-3 text-emerald-700"><BadgeCheck className="h-5 w-5" /></span>
             </div>
           </Card>
