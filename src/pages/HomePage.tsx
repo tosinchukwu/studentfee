@@ -72,6 +72,9 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
               </Button>
             </form>
             <p className="flex items-center gap-2 text-xs text-slate-500"><LockKeyhole className="h-3.5 w-3.5" /> You review the amount before approving anything in your wallet.</p>
+            <Link href="/parent" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-800">
+              Open parent fee hub <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
           </Card>
 
           <Card className="flex flex-col justify-between gap-6 border border-slate-200/80 bg-gradient-to-br from-white to-slate-50 shadow-xl shadow-slate-900/[0.04]">
