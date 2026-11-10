@@ -1908,14 +1908,33 @@ mod tests {
 
         context("school.testnet", effective, None);
         let _apply = contract.apply_treasury_change(SCHOOL_ID.to_string());
-        context("registry.testnet", effective + 1, Some(PromiseResult::Successful(result)));
-        assert!(contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 4));
+
+        // Cancel and requeue the same destination while the old apply callback is in flight.
+        context("school.testnet", effective + 1, None);
+        contract.cancel_treasury_change(SCHOOL_ID.to_string());
+        context("school.testnet", effective + 2, None);
+        let _requeue = contract.queue_treasury_change(SCHOOL_ID.to_string(), account("new-treasury.testnet"));
+        context("registry.testnet", effective + 3, Some(PromiseResult::Successful(result.clone())));
+        assert!(contract.on_queue_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 6));
+        let new_effective = contract.schools.get(&SCHOOL_ID.to_string()).unwrap().treasury_effective_at.unwrap();
+        context("registry.testnet", effective + 4, Some(PromiseResult::Successful(result.clone())));
+        assert!(!contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 4));
+        let still_queued = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
+        assert_eq!(still_queued.treasury, account("treasury.testnet"));
+        assert_eq!(still_queued.queued_treasury, Some(account("new-treasury.testnet")));
+        assert_eq!(still_queued.treasury_effective_at, Some(new_effective));
+
+        context("school.testnet", new_effective, None);
+        let _new_apply = contract.apply_treasury_change(SCHOOL_ID.to_string());
+        context("registry.testnet", new_effective + 1, Some(PromiseResult::Successful(result)));
+        assert!(contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 6));
         let changed = contract.schools.get(&SCHOOL_ID.to_string()).unwrap();
         assert_eq!(changed.treasury, account("new-treasury.testnet"));
         assert_eq!(changed.queued_treasury, None);
         assert_eq!(contract.treasury_index.get(&account("treasury.testnet")), None);
         assert_eq!(contract.treasury_index.get(&account("new-treasury.testnet")), Some(SCHOOL_ID.to_string()));
-        assert!(!contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 1));
+        assert!(!contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 4));
+        assert!(!contract.on_apply_treasury_check(SCHOOL_ID.to_string(), account("new-treasury.testnet"), 6));
         assert_eq!(contract.schools.get(&SCHOOL_ID.to_string()).unwrap().treasury, account("new-treasury.testnet"));
     }
 
