@@ -25,7 +25,7 @@ Schools often reconcile cash, bank transfers and paper receipts manually. Parent
 
 Open **https://studentfee-weld.vercel.app** to inspect the deployed interface. The prototype uses NEAR Testnet.
 
-**Access note for judges:** administrator actions are restricted to the project owner's wallet, `mouseng20.testnet`. Its private key is not public and must never be requested or shared. You can inspect the public site without connecting a wallet, but creating invoices requires the authorized administrator to sign. To reproduce a parent payment, use an invoice link supplied by the project owner and your own NEAR Testnet wallet with testnet USDC. The public demo post for this submission includes a recorded walkthrough of the complete flow.
+**Access note for judges:** administrator actions are restricted to the project owner's wallet, `mouseng20.testnet`. Its private key is not public and must never be requested or shared. You can inspect the public site without connecting a wallet, but creating invoices requires the authorized administrator to sign. To reproduce a parent payment, use an invoice link supplied by the project owner and your own NEAR Testnet wallet with testnet USDC. The public demo post for this submission will include a recorded walkthrough of the complete flow.
 
 ### Administrator workflow (owner-authorized)
 
