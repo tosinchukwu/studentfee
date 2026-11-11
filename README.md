@@ -1,71 +1,129 @@
-# School Fee Payment Tracker
+# StudentFee — School Fee Payment Tracker
 
-A school fee collection tool. The school office creates fee invoices, each with a unique payment link. Parents pay in USDC on NEAR Testnet. The office sees every invoice and its status, and exports payments as a CSV for the accountant.
+StudentFee helps a school collect and reconcile fees using USDC on NEAR. A school administrator creates an invoice for a student and term; the parent receives a unique payment link; the school office tracks the payment state and exports invoice records as CSV.
 
-Built with [Arc Studio](https://studio.arc.io)
+**Live prototype:** https://studentfee-weld.vercel.app  
+**Source code:** https://github.com/tosinchukwu/studentfee  
+**Network:** NEAR Testnet only — this is a hackathon prototype, not a production payment service.
 
-## Problem
+Built primarily with Arc Studio for rapid prototyping of the USDC payment flow.
 
-Schools collect fees through cash, bank transfers and receipts that are matched by hand. Parents do not know whether a payment arrived. Bursars spend hours reconciling who paid what.
+## The problem
 
-## Solution
+Schools often reconcile cash, bank transfers and paper receipts manually. Parents may not know whether a payment has arrived, while bursars spend time matching transactions to students and terms.
 
-- The school office creates an invoice per student and term, with optional fee items and a due date.
-- Each invoice gets a public payment link. Parents do not need an account with the school.
-- The invoice moves from Pending to Paid, with a transaction reference and a timestamp.
-- The dashboard lists every invoice with filters. A CSV export opens directly in Excel or Google Sheets.
+## What StudentFee does
 
-## How it works
+- Lets a school administrator create a fee invoice with student, term, amount, optional fee items and due date.
+- Generates a shareable payment link for each invoice; parents do not need a school dashboard account.
+- Accepts testnet USDC through the deployed NEAR contract.
+- Tracks payment progress and only marks an invoice **Paid** after on-chain settlement is confirmed.
+- Shows transaction references and payment receipts.
+- Provides invoice filters, collection/outstanding summaries and CSV export.
 
-1. Open `/admin` and connect the school wallet (`mouseng20.testnet`), then press Sign in. You see the empty invoice dashboard.
-2. Press New invoice, fill in the student, term, due date and amount, and press Create invoice. Approve the wallet prompt. You get a payment link and the invoice shows as Pending.
-3. Press Copy payment link on the invoice and open it in another browser. You see the invoice details, the amount and the due date.
-4. Press Connect wallet to pay, then Pay. Approve the wallet prompt. The page shows "Step 1 of 2 done".
-5. Press Finish payment and approve it. The page shows Payment received, with the date, the payer and a transaction reference.
-6. Go back to the dashboard. The invoice shows as Paid with its reference. Collected and Outstanding totals update.
-7. Press Export CSV. A file downloads with one row per invoice, ready to open in a spreadsheet.
+## Try the live prototype
 
-## Tech stack
+Open **https://studentfee-weld.vercel.app**. The prototype uses NEAR Testnet and testnet USDC. You need a NEAR Testnet wallet; to complete a payment, the payer wallet also needs testnet USDC.
 
-- React 18, Vite, TypeScript, Tailwind CSS
-- Vercel serverless API (`api/`) sharing one request handler with a local Bun server
-- PostgreSQL for invoice details, sessions and settings (Neon via the Vercel Marketplace)
-- NEAR Testnet contract `v2.studentfee.testnet` (Rust, deployed separately) for invoice amounts, status and settlement, behind a contract adapter per version
-- Testnet USDC (NEP-141 token, 6 decimals)
-- NEAR Wallet Selector (NEAR Mobile, MyNearWallet, Meteor Wallet, HERE Wallet). NEAR Mobile on Android is wired in but still to be verified on a device: see `docs/near-mobile.md`
+### School administrator flow
 
-## How to run / try the demo
+1. Open [the administrator workspace](https://studentfee-weld.vercel.app/admin).
+2. Connect the configured school wallet, `mouseng20.testnet`, and sign in by approving the wallet's message-signing request.
+3. Choose **New invoice**, enter the student, term, amount and due date, then approve the on-chain invoice creation.
+4. Copy the generated payment link and open it in a separate browser or share it with the parent.
+5. Return to the dashboard to see invoice status and transaction details. Use **Export CSV** to download the invoice register.
 
-Prerequisites: Bun, a PostgreSQL database, and a NEAR Testnet account that holds the testnet USDC token.
+### Parent payment flow
+
+1. Open the invoice payment link shared by the school.
+2. Review the student, term, amount and due date.
+3. Connect a NEAR Testnet wallet and approve the USDC transfer.
+4. After the first transaction, choose **Finish payment** and approve the settlement transaction.
+5. Wait for the contract confirmation. The receipt shows the payer, timestamp and transaction reference; the invoice is marked **Paid** only after settlement is confirmed.
+
+**Important:** Payment uses two wallet approvals: one for the USDC transfer and one to finish settlement. A successful token transfer alone does not mean the invoice is Paid. If the parent closes the page between the two steps, the payment can be resumed from the payment page or dashboard.
+
+If you only want to inspect the interface, open the live site without connecting a wallet. Wallet and payment actions require a compatible NEAR Testnet wallet and testnet USDC.
+
+## NEAR integration
+
+The current submission uses the existing Standard v2 contract:
+
+- **Network:** NEAR Testnet
+- **Contract:** `v2.studentfee.testnet`
+- **Admin account:** `mouseng20.testnet`
+- **USDC:** NEP-141 testnet token, 6 decimals
+- **Contract source and deployed configuration:** see [docs/near-contract-integration.md](docs/near-contract-integration.md).
+
+The payment flow is:
+
+1. The administrator creates an invoice on the contract.
+2. The parent calls `ft_transfer_call` on the USDC token with the invoice ID.
+3. The contract records the incoming payment.
+4. `settle_invoice` transfers the funds to the configured treasury.
+5. The invoice becomes Paid only when the settlement callback confirms success.
+
+The backend stores application data and sessions in PostgreSQL. It does not custody wallet private keys or sign payment transactions on behalf of users.
+
+## Technology
+
+- React 18, Vite, TypeScript and Tailwind CSS
+- NEAR Wallet Selector
+- NEAR Rust contract and NEP-141 USDC
+- Vercel serverless API routes
+- PostgreSQL (Neon through the Vercel Marketplace)
+- Bun for package management and local development
+
+## Known limitations and honest scope
+
+- The app is deployed for **NEAR Testnet only**. Do not use real funds.
+- Simultaneous payments for the same invoice from two parents at the exact same moment have not been tested.
+- NEAR Mobile Android integration is wired in but has not been verified on a physical device; see [docs/near-mobile.md](docs/near-mobile.md).
+- The current submission is the Standard v2 experience. The separate Multi-school v3 work is still under development and is not part of the deployed payment flow.
+- This prototype has not had an independent security audit and is not presented as production-ready financial infrastructure.
+- No private keys or wallet seed phrases should be entered into the app.
+
+## Run locally
+
+Prerequisites: Bun, PostgreSQL and a NEAR Testnet account holding testnet USDC.
 
 ```bash
 bun install
-# start PostgreSQL locally, for example:
-docker run -d --name fees-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=fees -p 5432:5432 postgres:18-alpine
+docker run -d --name fees-pg \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=fees \
+  -p 5432:5432 postgres:18-alpine
 echo 'DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/fees' >> .env
-bun run dev      # web app (port 5173) and API (port 8787) together
+bun run dev
 ```
 
-Tables are created automatically on first use. Other commands: `bun run db:migrate` (apply migrations by hand), `bun run build` (production build into `dist/`), `bun run start` (API and built app on one port), `bun run check` (lint and type check).
+The web app runs on port 5173 and the API on port 8787. Tables are created automatically on first use.
 
-Environment variables:
+Useful commands:
 
-- `DATABASE_URL`: PostgreSQL connection string (required, server only)
-- `NEAR_RPC_URL`: NEAR Testnet RPC endpoint (optional)
-- `CONTRACT_ID`: the fee contract account (optional)
-- `USDC_TOKEN_ID`: the USDC token account (optional)
-- `ADMIN_ACCOUNT`: the school administrator account (optional)
-- `TREASURY_ACCOUNT`: the school account that receives payments (optional)
-- `SCHOOL_NAME`: default school name shown in the header (optional)
+- `bun run build` — production frontend build
+- `bun run typecheck` — TypeScript check
+- `bun run check` — project lint/type-check script
+- `bun run db:migrate` — apply database migrations manually
 
-Deploying to Vercel: see `docs/deploy-vercel.md`. Check `/api/health` after deploying.
+### Environment variables
 
-## Notes for judges
+- `DATABASE_URL` — PostgreSQL connection string (required, server-side only)
+- `NEAR_RPC_URL` — NEAR Testnet RPC endpoint (optional)
+- `CONTRACT_ID` — fee contract account (optional)
+- `USDC_TOKEN_ID` — USDC token account (optional)
+- `ADMIN_ACCOUNT` — school administrator account (optional)
+- `TREASURY_ACCOUNT` — school treasury account (optional)
+- `SCHOOL_NAME` — default school name (optional)
 
-- Built primarily with Arc Studio for rapid prototyping of the USDC payment flow.
+Never commit `.env` files or expose `DATABASE_URL` in client-side code.
+
+## Deployment
+
+See [docs/deploy-vercel.md](docs/deploy-vercel.md) for Vercel and PostgreSQL setup. After deployment, check `/api/health`; it should report that the database and v2 contract adapter are available.
+
+## Project notes
+
+- Built primarily with Arc Studio for rapid prototyping; the NEAR contract is separately implemented and deployed by the project owner.
 - No Arc Studio or Circle branding appears in the interface.
-- A practical real-world money tool: payments, tracking and export.
-- The app uses the contract as deployed. Statuses shown to users are friendly labels; the exact on-chain values are kept internally.
-- Payment has two wallet approvals: send the USDC, then finish the payment. A parent who closes the page between the two can come back, and anyone can press Finish payment.
-- Only the school administrator account can sign in to the dashboard. Invoice details are visible to a parent only through that invoice's link.
-- Not yet tested: payments for the same invoice from two parents at the exact same moment.
+- The interface uses friendly labels for some intermediate on-chain states while preserving the exact contract statuses internally.
