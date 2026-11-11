@@ -23,27 +23,29 @@ Schools often reconcile cash, bank transfers and paper receipts manually. Parent
 
 ## Try the live prototype
 
-Open **https://studentfee-weld.vercel.app**. The prototype uses NEAR Testnet and testnet USDC. You need a NEAR Testnet wallet; to complete a payment, the payer wallet also needs testnet USDC.
+Open **https://studentfee-weld.vercel.app** to inspect the deployed interface. The prototype uses NEAR Testnet.
 
-### School administrator flow
+**Access note for judges:** administrator actions are restricted to the project owner's wallet, `mouseng20.testnet`. Its private key is not public and must never be requested or shared. You can inspect the public site without connecting a wallet, but creating invoices requires the authorized administrator to sign. To reproduce a parent payment, use an invoice link supplied by the project owner and your own NEAR Testnet wallet with testnet USDC. The public demo post for this submission includes a recorded walkthrough of the complete flow.
 
-1. Open [the administrator workspace](https://studentfee-weld.vercel.app/admin).
-2. Connect the configured school wallet, `mouseng20.testnet`, and sign in by approving the wallet's message-signing request.
-3. Choose **New invoice**, enter the student, term, amount and due date, then approve the on-chain invoice creation.
-4. Copy the generated payment link and open it in a separate browser or share it with the parent.
-5. Return to the dashboard to see invoice status and transaction details. Use **Export CSV** to download the invoice register.
+### Administrator workflow (owner-authorized)
 
-### Parent payment flow
+1. The project owner opens [the administrator workspace](https://studentfee-weld.vercel.app/admin).
+2. The owner connects `mouseng20.testnet` and signs in by approving the wallet's message-signing request.
+3. The owner chooses **New invoice**, enters the student, term, amount and due date, then approves the on-chain invoice creation.
+4. The owner copies the generated payment link and shares it with the parent.
+5. The dashboard shows invoice status and transaction details; **Export CSV** downloads the invoice register.
 
-1. Open the invoice payment link shared by the school.
+### Parent payment flow (with a supplied invoice link)
+
+1. Open the invoice payment link supplied by the school.
 2. Review the student, term, amount and due date.
-3. Connect a NEAR Testnet wallet and approve the USDC transfer.
+3. Connect your own NEAR Testnet wallet and approve the USDC transfer.
 4. After the first transaction, choose **Finish payment** and approve the settlement transaction.
-5. Wait for the contract confirmation. The receipt shows the payer, timestamp and transaction reference; the invoice is marked **Paid** only after settlement is confirmed.
+5. Wait for contract confirmation. The receipt shows the payer, timestamp and transaction reference; the invoice is marked **Paid** only after settlement is confirmed.
 
 **Important:** Payment uses two wallet approvals: one for the USDC transfer and one to finish settlement. A successful token transfer alone does not mean the invoice is Paid. If the parent closes the page between the two steps, the payment can be resumed from the payment page or dashboard.
 
-If you only want to inspect the interface, open the live site without connecting a wallet. Wallet and payment actions require a compatible NEAR Testnet wallet and testnet USDC.
+If you only want to inspect the interface, no wallet connection is needed. Wallet and payment actions require a compatible NEAR Testnet wallet and testnet USDC.
 
 ## NEAR integration
 
