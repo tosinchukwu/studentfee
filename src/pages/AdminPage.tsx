@@ -335,7 +335,7 @@ export default function AdminPage() {
 
         <HealthStrip health={health} />
 
-        {showBulkImport && <BulkStudentImport shareBase={shareBase} onClose={() => setShowBulkImport(false)} onDone={() => void load()} />}
+        {showBulkImport && <BulkStudentImport shareBase={shareBase} existingInvoices={invoices ?? []} onClose={() => setShowBulkImport(false)} onDone={() => void load()} />}
 
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
           <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-5">
