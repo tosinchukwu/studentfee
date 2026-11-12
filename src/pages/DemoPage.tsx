@@ -98,7 +98,7 @@ export default function DemoPage({ schoolName }: { schoolName: string }) {
       setError('Enter an amount from 0.01 to 100 USDC.')
       return
     }
-    const match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(dueDate)
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dueDate)
     if (!match) {
       setError('Choose a valid due date.')
       return
@@ -200,7 +200,7 @@ export default function DemoPage({ schoolName }: { schoolName: string }) {
               <input id="demo-invoice" className="field !h-12 !rounded-xl" value={invoiceLink} onChange={(e) => { setInvoiceLink(e.target.value); setError('') }} placeholder="Paste a real invoice link or ID" />
               <Button type="submit" className="w-full">Open live invoice <ArrowRight className="h-4 w-4" /></Button>
             </form>
-            <div className="rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600"><strong className="text-ink">How judges can test:</strong><ol className="mt-2 list-inside list-decimal space-y-1"><li>Create an invoice with Wallet A.</li><li>Copy and share the generated link.</li><li>Open the link on another browser/device with Wallet B.</li><li>Pay using testnet USDC, then finish settlement.</li><li>Confirm the receipt displays Paid.</li></ol></div>
+            <div className="rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600"><strong className="text-ink">Try the payment flow:</strong><ol className="mt-2 list-inside list-decimal space-y-1"><li>Create an invoice with Wallet A.</li><li>Copy and share the generated link.</li><li>Open the link on another browser/device with Wallet B.</li><li>Pay using testnet USDC, then finish settlement.</li><li>Confirm the receipt displays Paid.</li></ol></div>
             <a href="https://testnet.nearblocks.io" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-700 hover:text-brand-800">Open NEAR Testnet explorer <ExternalLink className="h-4 w-4" /></a>
           </Card>
         </section>
