@@ -33,6 +33,17 @@ function newInvoiceId() {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+type PendingDemoMetadata = {
+  id: string
+  creator: string
+  studentName: string
+  studentId: string
+  term: string
+  amount: string
+  dueDate: number
+  note: string
+}
+
 export default function DemoPage({ schoolName }: { schoolName: string }) {
   const near = useNear()
   const { config, accountId } = near
@@ -47,9 +58,7 @@ export default function DemoPage({ schoolName }: { schoolName: string }) {
   const [note, setNote] = useState('')
   const [createdLink, setCreatedLink] = useState('')
   const [createdId, setCreatedId] = useState('')
-  const [pendingMetadata, setPendingMetadata] = useState<{
-    id: string; creator: string; studentName: string; studentId: string; term: string; amount: string; dueDate: number; note: string
-  } | null>(() => {
+  const [pendingMetadata, setPendingMetadata] = useState<PendingDemoMetadata | null>(() => {
     try {
       const saved = window.localStorage.getItem('studentfee-demo-pending-invoice')
       if (!saved) return null
@@ -67,7 +76,7 @@ export default function DemoPage({ schoolName }: { schoolName: string }) {
         typeof parsed.dueDate === 'number' &&
         typeof parsed.note === 'string'
       ) {
-        return parsed as NonNullable<typeof pendingMetadata>
+        return parsed as PendingDemoMetadata
       }
     } catch {
       // Ignore unavailable or malformed browser storage.
@@ -102,7 +111,7 @@ export default function DemoPage({ schoolName }: { schoolName: string }) {
     navigate(`/pay/${id}`)
   }
 
-  const saveMetadata = async (data: NonNullable<typeof pendingMetadata>) => {
+  const saveMetadata = async (data: PendingDemoMetadata) => {
     let lastError: unknown
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
