@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { ArrowRight, BadgeCheck, BookOpenCheck, GraduationCap, LockKeyhole, ReceiptText, ShieldCheck, WalletCards } from 'lucide-react'
+import { ArrowRight, BadgeCheck, BookOpenCheck, FlaskConical, GraduationCap, LockKeyhole, ReceiptText, ShieldCheck, WalletCards } from 'lucide-react'
 import { navigate, Link } from '../lib/router'
 import { Button, Card, Notice, PageShell } from '../components/ui'
 
@@ -49,6 +49,15 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
               <span className="inline-flex items-center gap-2"><ReceiptText className="h-4 w-4 text-teal-300" /> Digital receipts</span>
             </div>
           </div>
+        </section>
+
+        <section className="rounded-2xl border border-teal-200 bg-teal-50/70 p-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-teal-800"><FlaskConical className="h-4 w-4" /> Open public Demo</div>
+            <h2 className="mt-2 font-display text-xl font-semibold text-ink">Explore StudentFee before connecting a wallet.</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">View sample fee records and learn how to try a real NEAR Testnet payment using an invoice link.</p>
+          </div>
+          <Link href="/demo" className="mt-4 inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-teal-800 px-5 text-sm font-semibold text-white hover:bg-teal-900 sm:mt-0">Explore Demo <ArrowRight className="h-4 w-4" /></Link>
         </section>
 
         <section className="grid gap-5 lg:grid-cols-[1.15fr,0.85fr]">
