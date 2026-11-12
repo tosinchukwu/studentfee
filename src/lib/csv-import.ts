@@ -54,11 +54,44 @@ function key(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
-function validDate(value: string): boolean {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
-  if (!match) return false
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
-  return date.getUTCFullYear() === Number(match[1]) && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[3])
+function normalizeDate(value: string): string | null {
+  const input = value.trim()
+  let year: number
+  let month: number
+  let day: number
+
+  // Year-first formats: YYYY-MM-DD, YYYY/MM/DD, or YYYY.MM.DD.
+  let match = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(input)
+  if (match) {
+    year = Number(match[1])
+    month = Number(match[2])
+    day = Number(match[3])
+  } else {
+    // Day-first formats are preferred. If only one of the first two
+    // numbers can be a month, infer the order (e.g. 12/31/2026).
+    match = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/.exec(input)
+    if (!match) return null
+    const first = Number(match[1])
+    const second = Number(match[2])
+    year = Number(match[3])
+    if (first > 12 && second <= 12) {
+      day = first
+      month = second
+    } else if (second > 12 && first <= 12) {
+      month = first
+      day = second
+    } else {
+      // Ambiguous dates such as 04/05/2026 are read as DD/MM/YYYY.
+      day = first
+      month = second
+    }
+  }
+
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (year < 1000 || date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null
+
+  return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
 }
 
 export function parseStudentCsv(input: string): StudentCsvRow[] {
@@ -86,7 +119,8 @@ export function parseStudentCsv(input: string): StudentCsvRow[] {
     const studentId = value(columns.id)
     const term = value(columns.term)
     const amount = value(columns.amount).replace(/^\$/, '')
-    const dueDate = value(columns.due)
+    const rawDueDate = value(columns.due)
+    const dueDate = normalizeDate(rawDueDate) ?? rawDueDate
     const note = value(columns.note)
     let error: string | null = null
 
@@ -97,7 +131,7 @@ export function parseStudentCsv(input: string): StudentCsvRow[] {
     else if (studentId.length > 40) error = 'Student ID is longer than 40 characters.'
     else if (!toBaseUnits(amount) || toBaseUnits(amount)! <= 0n) error = 'Enter a fee greater than 0 with up to 6 decimal places.'
     else if (toBaseUnits(amount)! > 1_000_000_000_000n) error = 'Fee exceeds the 1,000,000 USDC invoice limit.'
-    else if (!validDate(dueDate)) error = 'Due date must be a real date in YYYY-MM-DD format.'
+    else if (!normalizeDate(rawDueDate)) error = 'Enter a valid date, e.g. 2026-12-15 or 15/12/2026 (DD/MM/YYYY).'
     else if (note.length > 300) error = 'Note is longer than 300 characters.'
 
     if (!error && studentId) {
