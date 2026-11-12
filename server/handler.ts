@@ -15,7 +15,7 @@ import {
   setInvoiceTx,
   setSetting,
 } from './store.js'
-import { getTransaction } from '../src/lib/rpc.js'
+import { getTransaction, viewCall } from '../src/lib/rpc.js'
 import { toBaseUnits, toDecimalText } from '../src/lib/money.js'
 import type { LineItem, PublicConfig } from '../src/lib/types.js'
 
@@ -72,6 +72,7 @@ async function publicConfig(): Promise<PublicConfig> {
   return {
     network: config.network,
     contractId: config.contractId,
+    demoContractId: config.demoContractId,
     usdcId: config.usdcId,
     adminAccount: config.adminAccount,
     treasury: config.treasury,
@@ -130,6 +131,63 @@ async function createInvoice(request: Request): Promise<Response> {
     { id, amountBase: total.toString(), dueDate, contractId: adapter.contractId, contractVersion: adapter.version },
     201,
   )
+}
+
+
+/**
+ * Public demo metadata registration. A row is accepted only after the matching invoice
+ * is confirmed on the dedicated permissionless Demo contract.
+ */
+async function createDemoInvoice(request: Request): Promise<Response> {
+  const input = await body(request)
+  const id = text(input.id, 'Invoice ID', 32)
+  if (!/^[0-9a-f]{32}$/.test(id)) throw new HttpError(400, 'Invalid invoice ID.')
+  const creator = text(input.creator, 'Creator wallet', 64)
+  if (!ACCOUNT_PATTERN.test(creator)) throw new HttpError(400, 'Invalid creator wallet.')
+  const studentName = text(input.studentName, 'Student name', 120)
+  const studentId = text(input.studentId, 'Student ID', 40, false)
+  const term = text(input.term, 'Term', 60)
+  const note = text(input.note, 'Note', 300, false)
+  const amount = toBaseUnits(typeof input.amount === 'string' ? input.amount : '')
+  if (amount === null || amount < 10_000n || amount > 100_000_000n) {
+    throw new HttpError(400, 'Demo invoices must be between 0.01 and 100 USDC.')
+  }
+  const dueDate = Number(input.dueDate)
+  if (!Number.isSafeInteger(dueDate)) throw new HttpError(400, 'Choose a valid due date.')
+  const now = Date.now()
+  if (dueDate <= now || dueDate > now + 365 * 24 * 60 * 60 * 1000) {
+    throw new HttpError(400, 'The due date must be within the next 365 days.')
+  }
+
+  const onchain = await viewCall<{ creator: string; amount: string; due_date: number; status: string } | null>(
+    config.rpcUrl, config.demoContractId, 'get_invoice', { invoice_id: id },
+  )
+  if (!onchain || onchain.creator !== creator || BigInt(onchain.amount) !== amount) {
+    throw new HttpError(409, 'The on-chain Demo invoice does not match these details.')
+  }
+  // NEAR u64 timestamps are nanoseconds and exceed JavaScript's safe integer range.
+  // Allow sub-millisecond JSON number rounding while binding metadata to the chosen date.
+  const expectedNs = dueDate * 1_000_000
+  if (!Number.isFinite(onchain.due_date) || Math.abs(onchain.due_date - expectedNs) > 1_000_000) {
+    throw new HttpError(409, 'The on-chain due date does not match these details.')
+  }
+  if (onchain.status !== 'Pending') throw new HttpError(409, 'Only a new pending Demo invoice can be registered.')
+  if (await getInvoice(id)) throw new HttpError(409, 'This invoice has already been registered.')
+
+  await insertInvoice({
+    id,
+    contract_id: config.demoContractId,
+    contract_version: 'demo',
+    student_name: studentName,
+    student_id: studentId,
+    term,
+    amount_base: amount.toString(),
+    due_date_ms: dueDate,
+    line_items: [],
+    note,
+    created_at: Date.now(),
+  })
+  return json({ id, amountBase: amount.toString(), dueDate, contractId: config.demoContractId, contractVersion: 'demo' }, 201)
 }
 
 async function listAll(request: Request): Promise<Response> {
@@ -249,6 +307,7 @@ async function route(request: Request, url: URL): Promise<Response> {
 
   if (pathname === '/api/health' && method === 'GET') return healthCheck()
   if (pathname === '/api/config' && method === 'GET') return json(await publicConfig())
+  if (pathname === '/api/demo/invoices' && method === 'POST') return createDemoInvoice(request)
 
   if (invoiceMatch && method === 'GET' && !invoiceMatch[2]) {
     const row = await getInvoice(invoiceMatch[1])
