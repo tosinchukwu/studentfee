@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage'
 import PayPage from './pages/PayPage'
 import ParentPage from './pages/ParentPage'
 import MultiSchoolPage from './pages/MultiSchoolPage'
+import DemoPage from './pages/DemoPage'
 import { Card, Notice, PageShell, Spinner } from './components/ui'
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
 
   const pay = /^\/pay\/([0-9a-f]{32})\/?$/.exec(path)
   if (pay) return <PayPage id={pay[1]} />
+  if (path === '/demo' || path.startsWith('/demo/')) return <DemoPage schoolName={config.schoolName} />
   if (path === '/parent' || path.startsWith('/parent/')) return <ParentPage />
   if (path === '/multischool' || path.startsWith('/multischool/')) return <MultiSchoolPage />
   if (path.startsWith('/admin')) return <AdminPage />

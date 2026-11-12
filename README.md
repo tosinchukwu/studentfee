@@ -26,7 +26,7 @@ Schools often reconcile cash, bank transfers and paper receipts manually. Parent
 
 Open **https://studentfee-weld.vercel.app** to inspect the deployed interface. The prototype uses NEAR Testnet.
 
-**Access note for judges:** administrator actions are restricted to the project owner's wallet, `mouseng20.testnet`. Its private key is not public and must never be requested or shared. You can inspect the public site without connecting a wallet, but creating invoices requires the authorized administrator to sign. To reproduce a parent payment, use an invoice link supplied by the project owner and your own NEAR Testnet wallet with testnet USDC. The public demo post for this submission will include a recorded walkthrough of the complete flow.
+**Public Demo:** open [the Demo page](https://studentfee-weld.vercel.app/demo) to explore clearly labelled sample students, invoices and statuses without connecting a wallet. Sample records are illustrative only; they are not stored on-chain and cannot be paid. To try a real payment, use a live invoice link supplied by the project team and your own NEAR Testnet wallet with testnet USDC. Administrator actions remain restricted to the project owner's wallet, `mouseng20.testnet`; its private key is not public and must never be requested or shared.
 
 ### Administrator workflow (owner-authorized)
 
@@ -48,7 +48,7 @@ Open **https://studentfee-weld.vercel.app** to inspect the deployed interface. T
 
 **Important:** Payment uses two wallet approvals: one for the USDC transfer and one to finish settlement. A successful token transfer alone does not mean the invoice is Paid. If the parent closes the page between the two steps, the payment can be resumed from the payment page or dashboard.
 
-If you only want to inspect the interface, no wallet connection is needed. Wallet and payment actions require a compatible NEAR Testnet wallet and testnet USDC.
+If you only want to inspect the interface, open the public [Demo page](https://studentfee-weld.vercel.app/demo); no wallet connection is needed. Wallet and payment actions require a compatible NEAR Testnet wallet and testnet USDC.
 
 ## NEAR integration
 
