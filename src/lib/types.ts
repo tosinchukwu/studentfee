@@ -19,7 +19,7 @@ export type DisplayStatus =
   | 'Cancelled'
 
 /** Deployed contract generations. v3 is specified but not built yet. */
-export type ContractVersion = 'v2' | 'v3'
+export type ContractVersion = 'v2' | 'demo' | 'v3'
 
 export interface OnchainInvoice {
   amount: string
@@ -66,6 +66,7 @@ export interface InvoiceView {
 export interface PublicConfig {
   network: string
   contractId: string
+  demoContractId: string
   usdcId: string
   adminAccount: string
   treasury: string
