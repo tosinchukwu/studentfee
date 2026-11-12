@@ -126,6 +126,7 @@ export default function DemoPage({ schoolName }: { schoolName: string }) {
 
     setBusy(true)
     setCreatedLink('')
+    let publishedOnChain = false
     try {
       const draft: Pick<InvoiceView, 'id' | 'contractId' | 'amountBase' | 'dueDate'> = {
         id: data.id,
@@ -134,10 +135,14 @@ export default function DemoPage({ schoolName }: { schoolName: string }) {
         dueDate: dueMs,
       }
       await near.call(clientAdapter('demo').publish(draft))
+      publishedOnChain = true
       setPendingMetadata(data)
       await saveMetadata(data)
     } catch (cause) {
-      if (pendingMetadata) {
+      if (publishedOnChain) {
+        // React state updates are asynchronous; preserve this attempt's exact metadata
+        // even when the registration request fails immediately after wallet approval.
+        setPendingMetadata(data)
         setError('The invoice is already on-chain, but its details could not be saved yet. Use Retry registration below; do not create another invoice.')
       } else {
         setError(friendlyError(cause))

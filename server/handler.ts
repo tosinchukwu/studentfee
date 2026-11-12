@@ -159,25 +159,49 @@ async function createDemoInvoice(request: Request): Promise<Response> {
     throw new HttpError(400, 'The due date must be within the next 365 days.')
   }
 
-  const onchain = await viewCall<{ creator: string; amount: string; due_date: number; status: string } | null>(
+  const onchain = await viewCall<{ creator: string; amount: string; due_date: number | string; status: string } | null>(
     config.rpcUrl, config.demoContractId, 'get_invoice', { invoice_id: id },
   )
   if (!onchain || onchain.creator !== creator || BigInt(onchain.amount) !== amount) {
     throw new HttpError(409, 'The on-chain Demo invoice does not match these details.')
   }
-  // NEAR u64 timestamps are nanoseconds and exceed JavaScript's safe integer range.
-  // Allow sub-millisecond JSON number rounding while binding metadata to the chosen date.
-  const expectedNs = dueDate * 1_000_000
-  if (!Number.isFinite(onchain.due_date) || Math.abs(onchain.due_date - expectedNs) > 1_000_000) {
+  // Compare NEAR's nanosecond u64 as integers. Converting through floating-point
+  // arithmetic can otherwise create avoidable precision differences.
+  let chainDueNs: bigint
+  try {
+    chainDueNs = BigInt(onchain.due_date)
+  } catch {
+    throw new HttpError(409, 'The on-chain due date could not be verified. Please retry.')
+  }
+  const expectedNs = BigInt(dueDate) * 1_000_000n
+  const dateDifference = chainDueNs > expectedNs ? chainDueNs - expectedNs : expectedNs - chainDueNs
+  if (dateDifference > 1_000_000n) {
     throw new HttpError(409, 'The on-chain due date does not match these details.')
   }
-  if (onchain.status !== 'Pending') throw new HttpError(409, 'Only a new pending Demo invoice can be registered.')
-  if (await getInvoice(id)) throw new HttpError(409, 'This invoice has already been registered.')
 
-  await insertInvoice({
+  // Registration is deliberately idempotent: if the database insert succeeded but
+  // the HTTP response was lost, Retry must return the existing link instead of 409.
+  const existing = await getInvoice(id)
+  if (existing) {
+    const sameDetails =
+      existing.contract_id === config.demoContractId &&
+      existing.contract_version === 'demo' &&
+      existing.student_name === studentName &&
+      existing.student_id === studentId &&
+      existing.term === term &&
+      existing.amount_base === amount.toString() &&
+      Number(existing.due_date_ms) === dueDate &&
+      existing.note === note
+    if (!sameDetails) throw new HttpError(409, 'This invoice ID is already registered with different details.')
+    return json({ id, amountBase: amount.toString(), dueDate, contractId: config.demoContractId, contractVersion: 'demo' })
+  }
+
+  if (onchain.status !== 'Pending') throw new HttpError(409, 'Only a pending Demo invoice can be registered.')
+
+  const invoice = {
     id,
     contract_id: config.demoContractId,
-    contract_version: 'demo',
+    contract_version: 'demo' as const,
     student_name: studentName,
     student_id: studentId,
     term,
@@ -186,7 +210,23 @@ async function createDemoInvoice(request: Request): Promise<Response> {
     line_items: [],
     note,
     created_at: Date.now(),
-  })
+  }
+  try {
+    await insertInvoice(invoice)
+  } catch (error) {
+    // A concurrent retry may have inserted the same invoice first.
+    const saved = await getInvoice(id).catch(() => null)
+    const sameDetails = saved &&
+      saved.contract_id === invoice.contract_id &&
+      saved.contract_version === invoice.contract_version &&
+      saved.student_name === invoice.student_name &&
+      saved.student_id === invoice.student_id &&
+      saved.term === invoice.term &&
+      saved.amount_base === invoice.amount_base &&
+      Number(saved.due_date_ms) === invoice.due_date_ms &&
+      saved.note === invoice.note
+    if (!sameDetails) throw error
+  }
   return json({ id, amountBase: amount.toString(), dueDate, contractId: config.demoContractId, contractVersion: 'demo' }, 201)
 }
 
