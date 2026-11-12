@@ -57,6 +57,8 @@ export interface NewInvoiceInput {
 export const api = {
   config: () => getJson<PublicConfig>('/api/config'),
   invoice: (id: string) => getJson<InvoiceView>(`/api/invoices/${id}`),
+  createDemoInvoice: (input: { id: string; creator: string; studentName: string; studentId: string; term: string; amount: string; dueDate: number; note: string }) =>
+    postJson<{ id: string; amountBase: string; dueDate: number; contractId: string; contractVersion: ContractVersion }>('/api/demo/invoices', input),
   recordTx: (id: string, kind: 'payment' | 'settlement', hash: string, signerId: string) =>
     postJson<{ ok: boolean }>(`/api/invoices/${id}/tx`, { kind, hash, signerId }),
 
