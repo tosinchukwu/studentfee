@@ -1,4 +1,4 @@
-name: Validate application
+name: Validate application and Demo contract
 
 on:
   pull_request:
@@ -14,15 +14,27 @@ jobs:
     name: Typecheck and production build
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - name: Install locked dependencies
-        run: bun install --frozen-lockfile
-      - name: TypeScript typecheck
-        run: bun run typecheck
-      - name: Build production frontend
-        run: bun run build
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run build
+
+  near-demo-contract:
+    name: Compile public Demo contract for NEAR Wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust and Wasm target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/near-demo
+      - name: Compile Demo contract
+        working-directory: contracts/near-demo
+        run: cargo build --locked --target wasm32-unknown-unknown --release
