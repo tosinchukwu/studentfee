@@ -37,4 +37,11 @@ jobs:
           workspaces: contracts/near-demo
       - name: Compile Demo contract
         working-directory: contracts/near-demo
-        run: cargo build --locked --target wasm32-unknown-unknown --release
+        run: cargo build --target wasm32-unknown-unknown --release
+      - name: Upload compiled Demo Wasm
+        uses: actions/upload-artifact@v4
+        with:
+          name: studentfee-demo-wasm
+          path: contracts/near-demo/target/wasm32-unknown-unknown/release/studentfee_public_demo.wasm
+          if-no-files-found: error
+          retention-days: 7
