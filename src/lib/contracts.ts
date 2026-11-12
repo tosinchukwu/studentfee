@@ -29,6 +29,15 @@ export interface ClientContractAdapter {
   refund(invoice: InvoiceRef): ContractCall
 }
 
+const demo: ClientContractAdapter = {
+  version: 'demo',
+  pay: (invoice, config) => ({ receiverId: config.usdcId, methodName: 'ft_transfer_call', args: { receiver_id: invoice.contractId, amount: invoice.amountBase, msg: invoice.id }, gas: GAS_100_TGAS, deposit: 1n }),
+  settle: (invoice) => ({ receiverId: invoice.contractId, methodName: 'settle_invoice', args: { invoice_id: invoice.id }, gas: GAS_100_TGAS }),
+  publish: (invoice) => ({ receiverId: invoice.contractId, methodName: 'create_invoice', args: { invoice_id: invoice.id, amount: invoice.amountBase, due_date: Math.floor(invoice.dueDate * 1_000_000) }, gas: GAS_30_TGAS, deposit: 10n ** 22n }),
+  cancel: (invoice) => ({ receiverId: invoice.contractId, methodName: 'cancel_invoice', args: { invoice_id: invoice.id }, gas: GAS_30_TGAS }),
+  refund: () => { throw new Error('Demo invoices do not support refunds.') },
+}
+
 const v2: ClientContractAdapter = {
   version: 'v2',
   pay: (invoice, config) => ({
@@ -66,5 +75,6 @@ const v2: ClientContractAdapter = {
 
 export function clientAdapter(version: ContractVersion): ClientContractAdapter {
   if (version === 'v2') return v2
+  if (version === 'demo') return demo
   throw new Error('This invoice uses a contract version this app does not support yet.')
 }
