@@ -19,7 +19,7 @@ Schools often reconcile cash, bank transfers and paper receipts manually. Parent
 - Accepts testnet USDC through the deployed NEAR contract.
 - Tracks payment progress and only marks an invoice **Paid** after on-chain settlement is confirmed.
 - Shows transaction references and payment receipts.
-- Provides invoice filters, collection/outstanding summaries and CSV export.
+- Provides invoice filters, collection/outstanding summaries and CSV export.\n- Imports up to 200 students from a validated CSV, publishes individual invoices in wallet-approved batches, and exports their payment links.
 
 ## Try the live prototype
 
@@ -33,7 +33,7 @@ Open **https://studentfee-weld.vercel.app** to inspect the deployed interface. T
 2. The owner connects `mouseng20.testnet` and signs in by approving the wallet's message-signing request.
 3. The owner chooses **New invoice**, enters the student, term, amount and due date, then approves the on-chain invoice creation.
 4. The owner copies the generated payment link and shares it with the parent.
-5. The dashboard shows invoice status and transaction details; **Export CSV** downloads the invoice register.
+5. For a class or school-wide upload, choose **Import CSV**, download the template, fill in Student Name, Term, Fee (USDC) and Due Date (Student ID and Note are optional), then upload and review the validation preview.\n6. Choose **Generate invoices and payment links**. The app publishes up to five individual invoices per wallet transaction and verifies each batch against the v2 contract. Download the resulting payment-links CSV to share with parents. If a batch is interrupted, inspect the saved drafts in the invoice list before retrying; do not upload the same file again.\n7. The dashboard shows invoice status and transaction details; **Export CSV** downloads the invoice register.
 
 ### Parent payment flow (with a supplied invoice link)
 
@@ -49,7 +49,7 @@ If you only want to inspect the interface, no wallet connection is needed. Walle
 
 ## NEAR integration
 
-The current submission uses the existing Standard v2 contract:
+Bulk import uses the same existing `create_invoice` method as manual invoice creation. It does not change or redeploy the contract; it creates one on-chain invoice per student. The current submission uses the existing Standard v2 contract:
 
 - **Network:** NEAR Testnet
 - **Contract:** `v2.studentfee.testnet`
