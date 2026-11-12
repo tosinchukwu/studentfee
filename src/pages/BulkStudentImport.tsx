@@ -6,6 +6,7 @@ import { downloadStudentCsvTemplate, parseStudentCsv, type StudentCsvRow } from 
 import { formatAmount } from '../lib/money'
 import { friendlyError, useNear } from '../lib/near'
 import { Button, Card, Notice } from '../components/ui'
+import type { InvoiceView } from '../lib/types'
 
 interface PublishedStudent { studentName: string; studentId: string; amountBase: string; invoiceId: string; paymentLink: string }
 const BATCH_SIZE = 5
@@ -25,8 +26,8 @@ function downloadResults(rows: PublishedStudent[]) {
   document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url)
 }
 
-export default function BulkStudentImport({ shareBase, onClose, onDone }: {
-  shareBase: string | null; onClose: () => void; onDone: () => void
+export default function BulkStudentImport({ shareBase, existingInvoices, onClose, onDone }: {
+  shareBase: string | null; existingInvoices: InvoiceView[]; onClose: () => void; onDone: () => void
 }) {
   const near = useNear()
   const [rows, setRows] = useState<StudentCsvRow[]>([])
@@ -48,8 +49,15 @@ export default function BulkStudentImport({ shareBase, onClose, onDone }: {
     if (file.size > 1_000_000) { setError('The CSV file must be smaller than 1 MB.'); return }
     try {
       const parsed = parseStudentCsv(await file.text())
-      setRows(parsed); setFileName(file.name)
-      if (parsed.some((row) => row.error)) setError('Correct the highlighted rows in your spreadsheet, then upload the corrected CSV.')
+      const existingKeys = new Set(existingInvoices.filter((invoice) => invoice.studentId && invoice.status !== 'Cancelled').map((invoice) => `${invoice.studentId.toLowerCase()}::${invoice.term.toLowerCase()}`))
+      const checked = parsed.map((row) => {
+        const key = `${row.studentId.toLowerCase()}::${row.term.toLowerCase()}`
+        return !row.error && row.studentId && existingKeys.has(key)
+          ? { ...row, error: 'An invoice already exists for this Student ID and Term.' }
+          : row
+      })
+      setRows(checked); setFileName(file.name)
+      if (checked.some((row) => row.error)) setError('Correct the highlighted rows in your spreadsheet, then upload the corrected CSV.')
     } catch (e) { setError(friendlyError(e)) }
   }
 
