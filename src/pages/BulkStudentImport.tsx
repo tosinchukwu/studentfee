@@ -104,7 +104,7 @@ export default function BulkStudentImport({ shareBase, onClose, onDone }: {
       <div className="flex items-start justify-between gap-3">
         <div><h2 className="font-display text-xl font-semibold text-ink">Bulk student import</h2>
           <p className="mt-1 text-sm text-slate-600">Upload up to 200 students and publish individual invoices in wallet-approved batches.</p></div>
-        <Button variant="ghost" onClick={onClose} aria-label="Close bulk import"><X className="h-4 w-4" /></Button>
+        <Button variant="ghost" onClick={onClose} disabled={busy} aria-label="Close bulk import"><X className="h-4 w-4" /></Button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="secondary" onClick={downloadStudentCsvTemplate}><Download className="h-4 w-4" /> Download CSV template</Button>
@@ -114,7 +114,7 @@ export default function BulkStudentImport({ shareBase, onClose, onDone }: {
         <FileSpreadsheet className="h-8 w-8 text-brand-700" />
         <span className="font-semibold text-ink">{fileName || 'Choose a student CSV file'}</span>
         <span className="text-xs text-slate-500">CSV only · maximum 1 MB · up to 200 students</span>
-        <input type="file" accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={(event) => void selectFile(event.target.files?.[0])} />
+        <input type="file" accept=".csv,text/csv" className="sr-only" disabled={busy || draftsCreated > 0} onChange={(event) => void selectFile(event.target.files?.[0])} />
       </label>
       {rows.length > 0 && <div className="space-y-3">
         <div className="flex gap-3 text-sm">
@@ -138,7 +138,7 @@ export default function BulkStudentImport({ shareBase, onClose, onDone }: {
         <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-brand-700 transition-all" style={{ width: `${validRows.length ? (progress / validRows.length) * 100 : 0}%` }} /></div>
         <p className="text-xs text-slate-500">Approve each batch in your NEAR wallet. Each transaction contains up to five invoices.</p>
       </div>}
-      {draftsCreated > published.length && !complete && !busy && <Notice tone="warn">{draftsCreated - published.length} draft invoice(s) were saved but not confirmed as published. Refresh the invoice list and publish drafts marked Not published before retrying.</Notice>}
+      {draftsCreated > published.length && !complete && !busy && <Notice tone="warn">{draftsCreated - published.length} draft invoice(s) were saved but not confirmed as published. Do not restart this upload, because that could create duplicates. Refresh the invoice list and inspect these drafts; publish only those still marked Not published.</Notice>}
       {published.length > 0 && <div className="space-y-3">
         <Notice tone={complete ? 'info' : 'warn'}>{complete ? `Successfully published ${published.length} of ${validRows.length} invoices. Individual payment links are ready.` : `${published.length} invoices have been verified on-chain so far.`}</Notice>
         <Button variant="secondary" onClick={() => downloadResults(published)}><Download className="h-4 w-4" /> Download payment links CSV</Button>
@@ -149,7 +149,7 @@ export default function BulkStudentImport({ shareBase, onClose, onDone }: {
       </div>}
       {error && <Notice tone="error">{error}</Notice>}
       {!complete && <div className="flex flex-wrap gap-2">
-        <Button busy={busy} disabled={!rows.length || invalidCount > 0 || validRows.length === 0 || busy} onClick={() => void startImport()}><Upload className="h-4 w-4" /> {busy ? 'Working...' : 'Generate invoices and payment links'}</Button>
+        <Button busy={busy} disabled={!rows.length || invalidCount > 0 || validRows.length === 0 || busy || draftsCreated > 0} onClick={() => void startImport()}><Upload className="h-4 w-4" /> {busy ? 'Working...' : 'Generate invoices and payment links'}</Button>
         <Button variant="secondary" disabled={busy} onClick={onClose}>Cancel</Button>
       </div>}
       {complete && <Button onClick={onClose}>Done</Button>}
