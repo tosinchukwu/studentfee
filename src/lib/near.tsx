@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { actionCreators } from '@near-js/transactions'
 import '@near-wallet-selector/modal-ui/styles.css'
 import { api } from './api'
+import type { ContractCall } from './contracts'
 import { accountExists } from './rpc'
 import type { PublicConfig } from './types'
 
@@ -53,6 +54,7 @@ interface NearContextValue {
     gas: bigint
     deposit?: bigint
   }) => Promise<string | null>
+  callBatch: (calls: ContractCall[]) => Promise<string | null>
   signLogin: (nonce: string, message: string, recipient: string) => Promise<SignedLogin>
 }
 
@@ -172,6 +174,19 @@ export function NearProvider({ children }: { children: ReactNode }) {
     return outcome?.transaction_outcome?.id ?? null
   }, [])
 
+  const callBatch = useCallback<NearContextValue['callBatch']>(async (calls) => {
+    const selector = selectorRef.current
+    if (!selector) throw new Error('The wallet is still loading.')
+    if (calls.length < 1 || calls.length > 5) throw new Error('A transaction batch must contain between one and five invoices.')
+    const receiverId = calls[0].receiverId
+    if (calls.some((call) => call.receiverId !== receiverId || call.deposit)) throw new Error('All batch actions must target the same contract and must not attach a deposit.')
+    const wallet = await selector.wallet()
+    const outcome = await wallet.signAndSendTransaction({
+      receiverId,
+      actions: calls.map((call) => actionCreators.functionCall(call.methodName, call.args, call.gas, call.deposit ?? 0n)),
+    })
+    return outcome?.transaction_outcome?.id ?? null
+  }, [])
   const signLogin = useCallback<NearContextValue['signLogin']>(async (nonce, message, recipient) => {
     const selector = selectorRef.current
     if (!selector) throw new Error('The wallet is still loading.')
@@ -183,8 +198,8 @@ export function NearProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ config, loadError, accountId, connect, connectOther, disconnect, call, signLogin }),
-    [config, loadError, accountId, connect, connectOther, disconnect, call, signLogin],
+    () => ({ config, loadError, accountId, connect, connectOther, disconnect, call, callBatch, signLogin }),
+    [config, loadError, accountId, connect, connectOther, disconnect, call, callBatch, signLogin],
   )
   return <NearContext.Provider value={value}>{children}</NearContext.Provider>
 }

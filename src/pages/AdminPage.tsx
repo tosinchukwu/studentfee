@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, ArrowUpRight, CheckCircle2, Clock3, Download, FileText, Plus, Search, ShieldCheck, TriangleAlert, Wallet } from 'lucide-react'
+import { Activity, ArrowUpRight, CheckCircle2, Clock3, Download, FileText, Plus, Search, Upload, ShieldCheck, TriangleAlert, Wallet } from 'lucide-react'
 import { clsx } from 'clsx'
 import { toast } from 'sonner'
 import { ApiError, api, session } from '../lib/api'
@@ -12,6 +12,7 @@ import type { DisplayStatus, HealthReport, InvoiceView } from '../lib/types'
 import { Button, Card, Notice, PageShell, Spinner } from '../components/ui'
 import InvoiceList, { type RowAction } from './InvoiceList'
 import NewInvoiceForm from './NewInvoiceForm'
+import BulkStudentImport from './BulkStudentImport'
 import AdminWorkspace from '../components/AdminWorkspace'
 
 type Filter = 'All' | DisplayStatus
@@ -121,6 +122,7 @@ export default function AdminPage() {
   const [filter, setFilter] = useState<Filter>('All')
   const [query, setQuery] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [showBulkImport, setShowBulkImport] = useState(false)
   const [created, setCreated] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -322,13 +324,18 @@ export default function AdminPage() {
             <Button variant="secondary" busy={exporting} onClick={() => void exportCsv()}>
               <Download className="h-4 w-4" aria-hidden /> Export CSV
             </Button>
-            <Button onClick={() => { setShowForm(true); setCreated(null) }}>
+            <Button variant="secondary" onClick={() => { setShowBulkImport(true); setShowForm(false) }}>
+              <Upload className="h-4 w-4" aria-hidden /> Import CSV
+            </Button>
+            <Button onClick={() => { setShowBulkImport(false); setShowForm(true); setCreated(null) }}>
               <Plus className="h-4 w-4" aria-hidden /> New invoice
             </Button>
           </div>
         </div>
 
         <HealthStrip health={health} />
+
+        {showBulkImport && <BulkStudentImport shareBase={shareBase} existingInvoices={invoices ?? []} onClose={() => setShowBulkImport(false)} onDone={() => void load()} />}
 
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
           <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-5">
