@@ -1,4 +1,5 @@
 use near_contract_standards::fungible_token::core::ext_ft_core;
+use near_contract_standards::storage_management::ext_storage_management;
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::U128;
@@ -49,6 +50,17 @@ impl Contract {
             invoices: LookupMap::new(b"demo-invoices"),
             creator_pending: LookupMap::new(b"demo-creator-pending"),
         }
+    }
+
+    /// Anyone may sponsor the contract's one-time USDC storage registration.
+    /// The caller supplies the token's required storage deposit; no treasury key is needed.
+    #[payable]
+    pub fn register_usdc_storage(&mut self) -> Promise {
+        require!(env::attached_deposit().as_yoctonear() > 0, "Attach the USDC storage deposit");
+        ext_storage_management::ext(self.usdc_token.clone())
+            .with_attached_deposit(env::attached_deposit())
+            .with_static_gas(Gas::from_tgas(20))
+            .storage_deposit(Some(env::current_account_id()), Some(true))
     }
 
     /// Public testnet-only invoice creation. The creator pays a small storage deposit.
