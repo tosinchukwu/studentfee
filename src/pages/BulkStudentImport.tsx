@@ -116,7 +116,7 @@ export default function BulkStudentImport({ shareBase, existingInvoices, onClose
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="secondary" onClick={downloadStudentCsvTemplate}><Download className="h-4 w-4" /> Download CSV template</Button>
-        <span className="text-xs text-slate-500">Required: Student Name, Term, Fee (USDC), Due Date. Student ID and Note are optional.</span>
+        <span className="text-xs text-slate-500">Required: Student Name, Term, Fee (USDC), Due Date. Dates accept DD/MM/YYYY or YYYY-MM-DD (ambiguous dates use DD/MM/YYYY). Student ID and Note are optional.</span>
       </div>
       <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center hover:border-brand-500">
         <FileSpreadsheet className="h-8 w-8 text-brand-700" />
