@@ -2,76 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 html {
   width: 100%;
   min-width: 320px;
   scroll-behavior: smooth;
+  background: #f3f2ec;
 }
 
-body,
-#root {
-  width: 100%;
-  min-width: 320px;
-}
+body, #root { width: 100%; min-width: 320px; }
 
 body {
   overflow-x: clip;
-}
-
-body {
   margin: 0;
   font-family: 'DM Sans', ui-sans-serif, sans-serif;
-  color: #17243b;
-  background: #f4f7fa;
+  color: #17251f;
+  background: #f3f2ec;
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-button,
-input {
-  font: inherit;
-}
+button, input { font: inherit; }
 
-::selection {
-  color: #fff;
-  background: #0f5f5b;
-}
+::selection { color: #142a24; background: #d6e5b5; }
 
 @layer components {
   .field {
     @apply w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-ink placeholder:text-slate-400 transition focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-100;
     min-height: 44px;
   }
-  .label {
-    @apply mb-1.5 block text-sm font-semibold text-slate-700;
-  }
+  .label { @apply mb-1.5 block text-sm font-semibold text-slate-700; }
+}
+
+/* StudentFee institutional visual system */
+:root {
+  --sf-forest: #142a24;
+  --sf-ink: #17251f;
+  --sf-paper: #fbfaf6;
+  --sf-canvas: #f3f2ec;
+  --sf-lime: #d6e5b5;
+  --sf-muted: #718078;
+}
+.font-display { letter-spacing: -0.035em; }
+.shadow-card {
+  box-shadow: 0 1px 2px rgba(20,42,36,.035), 0 10px 30px rgba(20,42,36,.055);
+}
+input, select, textarea {
+  accent-color: #476c4c;
+}
+button, a { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline-color: #78945f; }
+
+@media (max-width: 640px) {
+  body { font-size: 14px; }
 }
 
 @media print {
-  .no-print {
-    display: none !important;
-  }
-  body {
-    background: white;
-  }
+  .no-print { display: none !important; }
+  body { background: white; }
 }
 
-/* Keep the wallet picker above page content and readable on small screens. */
-.nws-modal-wrapper {
-  z-index: 60;
-}
+.nws-modal-wrapper { z-index: 60; }
 
-
-/* Clean, print-ready payment receipt layout. */
-@page {
-  size: A4;
-  margin: 16mm;
-}
+@page { size: A4; margin: 16mm; }
 
 @media print {
   html, body {
@@ -81,13 +76,8 @@ input {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-  body * {
-    visibility: hidden;
-  }
-  body .receipt-print,
-  body .receipt-print * {
-    visibility: visible;
-  }
+  body * { visibility: hidden; }
+  body .receipt-print, body .receipt-print * { visibility: visible; }
   body .receipt-print {
     position: absolute;
     inset: 0 auto auto 0;
@@ -98,8 +88,5 @@ input {
     background: #fff !important;
     color: #111827 !important;
   }
-  body .receipt-print a {
-    color: #0f766e !important;
-    text-decoration: none !important;
-  }
+  body .receipt-print a { color: #0f766e !important; text-decoration: none !important; }
 }
