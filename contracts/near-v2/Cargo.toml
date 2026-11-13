@@ -1,0 +1,11 @@
+[package]
+name = "studentfee-v2"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { version = "=5.5.0", features = ["legacy"] }
+near-contract-standards = "=5.5.0"

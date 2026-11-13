@@ -12,6 +12,11 @@ This is the source of truth for the app. It comes from your deployment notes and
 - Contract and treasury are both registered with USDC (1.25 NEAR each)
 - Contract version 1.0.0, ABI schema 0.4.0
 
+## Source code
+- Standard v2 Rust source snapshot: [`contracts/near-v2/src/lib.rs`](../contracts/near-v2/src/lib.rs)
+- Deployment details and source-verification limitation: [`contracts/near-v2/README.md`](../contracts/near-v2/README.md)
+- The source is included for judge review; do not redeploy or change the live v2 contract from this repository without explicit approval.
+
 ## Methods
 - Admin: `create_invoice(invoice_id, amount, due_date)`, `cancel_invoice(invoice_id)`, `transfer_admin(new_admin)`
 - Payment: `ft_on_transfer` (called by USDC only), `settle_invoice(invoice_id)`, `refund_payment(invoice_id)`

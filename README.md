@@ -75,7 +75,7 @@ The project has two separate Testnet contract contexts:
 | School's Standard v2 invoice workflow | `v2.studentfee.testnet` | Authorized school administrator creates and manages invoices |
 | Public, permissionless demo invoice workflow | `demo.studentfee.testnet` | Any NEAR Testnet wallet can create a demo invoice, subject to contract limits |
 
-The configured USDC token is a NEP-141 Testnet token with 6 decimal places. See [the deployed contract reference](docs/near-contract-integration.md) and [the public Demo contract notes](contracts/near-demo/README.md) for contract details.
+The configured USDC token is a NEP-141 Testnet token with 6 decimal places. See [the deployed contract reference](docs/near-contract-integration.md), [the Standard v2 Rust source snapshot](contracts/near-v2/README.md), and [the public Demo contract notes](contracts/near-demo/README.md) for contract details.
 
 ### Settlement sequence
 
