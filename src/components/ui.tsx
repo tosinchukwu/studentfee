@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { GraduationCap, Home, Loader2, ShieldCheck } from 'lucide-react'
+import { GraduationCap, Home, Loader2, LogOut, ShieldCheck, Wallet } from 'lucide-react'
+import { useNear } from '../lib/near'
 import { clsx } from 'clsx'
 import { Link } from '../lib/router'
 import { STATUS_STYLES } from '../lib/format'
@@ -79,6 +80,10 @@ export function Notice({ tone, children }: { tone: 'error' | 'info' | 'warn'; ch
 }
 
 export function PageShell({ schoolName, right, children }: { schoolName: string; right?: ReactNode; children: ReactNode }) {
+  const near = useNear()
+  const disconnectWallet = async () => {
+    await near.disconnect()
+  }
   return (
     <div className="min-h-dvh bg-canvas">
       <header className="no-print sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
@@ -95,6 +100,10 @@ export function PageShell({ schoolName, right, children }: { schoolName: string;
           <div className="flex shrink-0 items-center gap-2">
             <Link href="/" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-ink shadow-sm transition hover:border-teal-300 hover:bg-teal-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"><Home className="h-4 w-4" aria-hidden /> Home</Link>
             <span className="hidden items-center gap-1.5 rounded-full bg-teal-50 px-3 py-1.5 text-xs font-semibold text-brand-800 sm:inline-flex"><ShieldCheck className="h-3.5 w-3.5" /> NEAR Testnet</span>
+            {near.accountId && <div className="flex items-center gap-2">
+              <span className="hidden max-w-[150px] truncate text-xs text-slate-500 md:inline" title={near.accountId}><Wallet className="mr-1 inline h-3.5 w-3.5" />{near.accountId}</span>
+              <button type="button" onClick={() => void disconnectWallet()} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-ink shadow-sm transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" aria-label="Disconnect wallet"><LogOut className="h-4 w-4" /> Disconnect</button>
+            </div>}
             {right}
           </div>
         </div>

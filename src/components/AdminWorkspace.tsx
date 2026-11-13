@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Activity, ArrowLeftRight, BarChart3, CreditCard, GraduationCap, Home, LayoutDashboard, LogOut, ReceiptText, ShieldCheck, Users } from 'lucide-react'
+import { Activity, ArrowLeftRight, BarChart3, CreditCard, GraduationCap, Home, LayoutDashboard, LogOut, Unplug, ReceiptText, ShieldCheck, Users } from 'lucide-react'
 
 const items = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
@@ -9,10 +9,11 @@ const items = [
   { label: 'Parents', href: '/parent', icon: Users },
 ]
 
-export default function AdminWorkspace({ schoolName, accountId, onSignOut, children }: {
+export default function AdminWorkspace({ schoolName, accountId, onSignOut, onDisconnectWallet, children }: {
   schoolName: string
   accountId: string
   onSignOut: () => void
+  onDisconnectWallet: () => void
   children: ReactNode
 }) {
   return (
@@ -39,6 +40,7 @@ export default function AdminWorkspace({ schoolName, accountId, onSignOut, child
             <p className="mt-2 text-xs leading-5 text-slate-400">Payment records are verified against the NEAR Testnet contract.</p>
           </div>
           <button type="button" onClick={onSignOut} className="mt-3 flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm text-slate-400 hover:bg-white/[.06] hover:text-white"><LogOut className="h-4 w-4" /> Sign out</button>
+          <button type="button" onClick={onDisconnectWallet} className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm text-slate-400 hover:bg-white/[.06] hover:text-white"><Unplug className="h-4 w-4" /> Disconnect wallet</button>
         </div>
       </aside>
       <div className="lg:pl-64">
@@ -52,7 +54,7 @@ export default function AdminWorkspace({ schoolName, accountId, onSignOut, child
               <a href="/" className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[.06] px-3 text-sm font-semibold text-slate-100 transition hover:border-teal-300/40 hover:bg-teal-300/10 hover:text-teal-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-300"><Home className="h-4 w-4" /> Home</a>
               <span className="hidden items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/[.08] px-3 py-2 text-xs font-semibold text-emerald-200 sm:inline-flex"><Activity className="h-3.5 w-3.5" /> Live sync</span>
               <span className="hidden max-w-[180px] truncate rounded-full border border-white/10 bg-white/[.04] px-3 py-2 text-xs text-slate-300 md:inline-flex"><CreditCard className="mr-2 h-3.5 w-3.5" /> {accountId}</span>
-              <button type="button" onClick={onSignOut} className="rounded-lg p-2 text-slate-400 hover:bg-white/10 lg:hidden" aria-label="Sign out"><LogOut className="h-5 w-5" /></button>
+              <button type="button" onClick={onDisconnectWallet} className="rounded-lg p-2 text-slate-400 hover:bg-white/10 lg:hidden" aria-label="Disconnect wallet"><Unplug className="h-5 w-5" /></button>
             </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto border-t border-white/[.06] px-3 py-2 lg:hidden">
