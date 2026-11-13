@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowRight, CheckCircle2, ClipboardList, ExternalLink, FlaskConical, WalletCards, Copy, PlusCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { navigate } from '../lib/router'
@@ -33,6 +33,17 @@ function newInvoiceId() {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
+type PendingDemoMetadata = {
+  id: string
+  creator: string
+  studentName: string
+  studentId: string
+  term: string
+  amount: string
+  dueDate: number
+  note: string
+}
+
 export default function DemoPage({ schoolName }: { schoolName: string }) {
   const near = useNear()
   const { config, accountId } = near
@@ -47,9 +58,43 @@ export default function DemoPage({ schoolName }: { schoolName: string }) {
   const [note, setNote] = useState('')
   const [createdLink, setCreatedLink] = useState('')
   const [createdId, setCreatedId] = useState('')
-  const [pendingMetadata, setPendingMetadata] = useState<{
-    id: string; creator: string; studentName: string; studentId: string; term: string; amount: string; dueDate: number; note: string
-  } | null>(null)
+  const [pendingMetadata, setPendingMetadata] = useState<PendingDemoMetadata | null>(() => {
+    try {
+      const saved = window.localStorage.getItem('studentfee-demo-pending-invoice')
+      if (!saved) return null
+      const parsed = JSON.parse(saved) as {
+        id?: unknown; creator?: unknown; studentName?: unknown; studentId?: unknown; term?: unknown
+        amount?: unknown; dueDate?: unknown; note?: unknown
+      }
+      if (
+        typeof parsed.id === 'string' &&
+        typeof parsed.creator === 'string' &&
+        typeof parsed.studentName === 'string' &&
+        typeof parsed.studentId === 'string' &&
+        typeof parsed.term === 'string' &&
+        typeof parsed.amount === 'string' &&
+        typeof parsed.dueDate === 'number' &&
+        typeof parsed.note === 'string'
+      ) {
+        return parsed as PendingDemoMetadata
+      }
+    } catch {
+      // Ignore unavailable or malformed browser storage.
+    }
+    return null
+  })
+
+  useEffect(() => {
+    try {
+      if (pendingMetadata) {
+        window.localStorage.setItem('studentfee-demo-pending-invoice', JSON.stringify(pendingMetadata))
+      } else {
+        window.localStorage.removeItem('studentfee-demo-pending-invoice')
+      }
+    } catch {
+      // The retry remains available for this page session if storage is blocked.
+    }
+  }, [pendingMetadata])
 
   const amountValid = useMemo(() => {
     const base = toBaseUnits(amount)
@@ -66,7 +111,7 @@ export default function DemoPage({ schoolName }: { schoolName: string }) {
     navigate(`/pay/${id}`)
   }
 
-  const saveMetadata = async (data: NonNullable<typeof pendingMetadata>) => {
+  const saveMetadata = async (data: PendingDemoMetadata) => {
     let lastError: unknown
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
