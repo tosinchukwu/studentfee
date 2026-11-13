@@ -300,6 +300,11 @@ export default function AdminPage() {
     setInvoices(null)
   }
 
+  const disconnectWallet = async () => {
+    await signOut()
+    await near.disconnect()
+  }
+
   const schoolName = near.config?.schoolName ?? 'School fees'
   if (!authed) {
     return (
@@ -313,7 +318,7 @@ export default function AdminPage() {
   if (counts['Not published']) filters.push('Not published')
 
   return (
-    <AdminWorkspace schoolName={schoolName} accountId={near.config?.adminAccount ?? ''} onSignOut={() => void signOut()}>
+    <AdminWorkspace schoolName={schoolName} accountId={near.config?.adminAccount ?? ''} onSignOut={() => void signOut()} onDisconnectWallet={() => void disconnectWallet()}>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
