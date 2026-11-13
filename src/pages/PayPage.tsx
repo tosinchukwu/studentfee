@@ -87,7 +87,7 @@ function Details({ invoice }: { invoice: InvoiceView }) {
       <div className="flex items-end justify-between border-t border-slate-100 pt-4">
         <div>
           <p className="text-sm text-slate-600">Total due</p>
-          <p className="font-display text-4xl font-semibold tabular-nums tracking-tight text-ink">
+          <p className="font-display text-4xl font-bold tabular-nums tracking-tight !text-[#17243b] opacity-100" style={{ color: "#17243b", opacity: 1 }}>
             ${formatAmount(invoice.amountBase)}
           </p>
         </div>

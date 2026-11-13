@@ -370,8 +370,8 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div id="analytics" className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
-          <Card className="space-y-5">
+        <div id="analytics" className="grid w-full min-w-0 grid-cols-1 gap-4">
+          <Card className="w-full min-w-0 space-y-5">
             <div className="flex items-start justify-between gap-3">
               <div><p className="text-sm font-semibold text-ink">Collection overview</p><p className="mt-1 text-xs text-slate-500">Live breakdown from your invoice records</p></div>
               <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-brand-800">USDC</span>
@@ -395,7 +395,7 @@ export default function AdminPage() {
             </div>
           </Card>
 
-          <Card className="space-y-4">
+          <Card className="w-full min-w-0 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div><p className="text-sm font-semibold text-ink">Recent invoices</p><p className="mt-1 text-xs text-slate-500">Latest records from the school office</p></div>
               <a href="#invoices" aria-label="View all invoices" title="View all invoices" className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl bg-slate-100 p-2 text-slate-600 transition hover:bg-teal-50 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"><ArrowUpRight className="h-4 w-4" /></a>
@@ -429,7 +429,7 @@ export default function AdminPage() {
           </Card>
         </div>
 
-        <div id="analytics-chart"><Card className="space-y-5">
+        <div id="analytics-chart" className="w-full min-w-0"><Card className="w-full min-w-0 space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div><p className="font-display text-lg font-semibold text-ink">Collection trend</p><p className="mt-1 text-xs text-slate-500">Confirmed paid invoices · last six months</p></div>
             <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-semibold text-brand-800">USDC · on-chain paid</span>
