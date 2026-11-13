@@ -37,7 +37,7 @@ export default function InvoiceList({
                 </p>
               </div>
               <div>
-                <p className="font-semibold tabular-nums">${formatAmount(invoice.amountBase)}</p>
+                <p className="font-bold tabular-nums text-[#17243b] opacity-100" style={{ color: "#17243b", opacity: 1 }}>${formatAmount(invoice.amountBase)}</p>
                 <p className="text-sm text-slate-600">Due {formatDate(invoice.dueDate)}</p>
               </div>
               <div>
