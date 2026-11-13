@@ -398,7 +398,7 @@ export default function AdminPage() {
           <Card className="space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div><p className="text-sm font-semibold text-ink">Recent invoices</p><p className="mt-1 text-xs text-slate-500">Latest records from the school office</p></div>
-              <span className="rounded-xl bg-slate-100 p-2 text-slate-600"><ArrowUpRight className="h-4 w-4" /></span>
+              <a href="#invoices" aria-label="View all invoices" title="View all invoices" className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl bg-slate-100 p-2 text-slate-600 transition hover:bg-teal-50 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"><ArrowUpRight className="h-4 w-4" /></a>
             </div>
             {recentInvoices.length ? (
               <ul className="divide-y divide-slate-100">

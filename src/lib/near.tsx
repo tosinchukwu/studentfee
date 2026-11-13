@@ -171,7 +171,7 @@ export function NearProvider({ children }: { children: ReactNode }) {
       receiverId,
       actions: [actionCreators.functionCall(methodName, args, gas, deposit)],
     })
-    return outcome?.transaction_outcome?.id ?? null
+    return outcome?.transaction?.hash ?? outcome?.transaction_outcome?.id ?? null
   }, [])
 
   const callBatch = useCallback<NearContextValue['callBatch']>(async (calls) => {
