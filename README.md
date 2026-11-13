@@ -33,8 +33,8 @@ You can inspect the product without connecting a wallet:
 1. Open the [live StudentFee app](https://studentfee-weld.vercel.app).
 2. Select **Explore Demo** or open the [public Demo page](https://studentfee-weld.vercel.app/demo).
 3. Review the sample fee register, invoice fields and public testnet invoice workflow.
-4. Open the [payment page for a real invoice](https://studentfee-weld.vercel.app/demo) only when you have a NEAR Testnet wallet and testnet USDC; the Demo page lets you create a live test invoice and then open its payment link.
-5. For the complete payment demonstration, use the same invoice link from a second wallet, approve the USDC transfer, select **Finish payment**, and wait until the receipt displays **Paid**. Follow the transaction reference to the NEAR Testnet explorer.
+4. To exercise the real Testnet flow, use the Demo page's **Create a live test invoice** form. Connect a NEAR Testnet wallet, enter a student, term, amount and future due date, then approve invoice creation. The creator wallet pays the contract's storage deposit.
+5. Copy the generated invoice link and open it from a second wallet with testnet USDC. Approve the USDC transfer, select **Finish payment**, and wait until the receipt displays **Paid**. Follow the transaction reference to the NEAR Testnet explorer.
 
 **Important distinction:** the three rows in the Demo page's example fee register are static sample data. They are illustrative UI records, not on-chain invoices and cannot be paid. The live invoice form on that same page creates a separate invoice on the public Demo contract. The public Demo is testnet-only and is not the school's private admin workspace.
 
@@ -89,9 +89,9 @@ The application backend uses PostgreSQL for invoice metadata and sessions. It do
 
 ### Track scope and deliberate limitations
 
-The hackathon's Real-World Money track lists NEAR Intents, stablecoins and meta-transactions as themes to consider. StudentFee currently uses **NEP-141 USDC directly on NEAR Testnet** and its own NEAR invoice contracts. It does **not** currently use the 1Click API, cross-chain NEAR Intents routing or a meta-transaction relayer. Wallet users approve their own transactions and pay their own Testnet gas. These are current product limitations, not features to assume.
+The hackathon's [Real-World Money track](https://github.com/nearai/near-hackathon-prompt-examples/blob/main/tracks/08-realworld.md) lists NEAR Intents, stablecoins and meta-transactions as themes to consider. StudentFee currently uses **NEP-141 USDC directly on NEAR Testnet** and its own NEAR invoice contracts. It does **not** currently use the 1Click API, cross-chain NEAR Intents routing or a meta-transaction relayer. Wallet users approve their own transactions and pay their own Testnet gas. These are current product limitations, not features to assume.
 
-The official hackathon instructions state that the listed integrations are hints rather than mandatory requirements and that a fitting NEAR contract is sufficient. StudentFee's core implementation is a school invoicing and stablecoin-payment workflow on NEAR.
+The official [NEAR HACKATHON instructions](https://nearhackathon.com/HACKATHON.md) state that the listed integrations are hints rather than mandatory requirements (Q-011) and that a fitting NEAR contract is sufficient. StudentFee's core implementation is a school invoicing and stablecoin-payment workflow on NEAR.
 
 ## Technology
 
