@@ -1,134 +1,174 @@
 # StudentFee — School Fee Payment Tracker
 
-StudentFee helps a school collect and reconcile fees using USDC on NEAR. A school administrator creates an invoice for a student and term; the parent receives a unique payment link; the school office tracks the payment state and exports invoice records as CSV.
+StudentFee is a school-fee invoicing and reconciliation prototype built on **NEAR**. A school creates an invoice for a student and term, shares a payment link with a parent, receives USDC on NEAR, and tracks the payment through on-chain settlement. The school can review receipts and export its invoice register as CSV.
 
-**Live prototype:** https://studentfee-weld.vercel.app  
-**Source code:** https://github.com/tosinchukwu/studentfee  
-**Network:** NEAR Testnet only — this is a hackathon prototype, not a production payment service.
+- **Live app:** https://studentfee-weld.vercel.app
+- **Public demo:** https://studentfee-weld.vercel.app/demo
+- **Admin workspace:** https://studentfee-weld.vercel.app/admin (project-owner access only)
+- **Source:** https://github.com/tosinchukwu/studentfee
+- **Hackathon track:** Real-World Money (`realworld`)
+- **Network:** NEAR Testnet; test tokens only. This is not a production payment service.
 
-Built primarily with Arc Studio for rapid prototyping of the USDC payment flow.
+## Problem
 
-## The problem
+Schools often reconcile fees from cash, bank transfers and paper receipts manually. Parents may not know whether a payment has actually arrived, and bursars spend time matching transactions to students and terms.
 
-Schools often reconcile cash, bank transfers and paper receipts manually. Parents may not know whether a payment has arrived, while bursars spend time matching transactions to students and terms.
+StudentFee gives each fee a shareable invoice link and an on-chain payment record. It is designed around a familiar school workflow rather than requiring parents to understand blockchain mechanics.
 
-## What StudentFee does
+## What is implemented
 
-- Lets a school administrator create a fee invoice with student, term, amount, optional fee items and due date.
-- Generates a shareable payment link for each invoice; parents do not need a school dashboard account.
-- Accepts testnet USDC through the deployed NEAR contract.
-- Tracks payment progress and only marks an invoice **Paid** after on-chain settlement is confirmed.
-- Shows transaction references and payment receipts.
-- Provides invoice filters, collection/outstanding summaries and CSV export.
-- Imports up to 200 students from a validated CSV, publishes individual invoices in wallet-approved batches, and exports their payment links.
+- Create individual fee invoices with student, term, amount, due date and optional fee details.
+- Generate a unique payment link for each invoice.
+- Accept NEAR Testnet USDC using the NEP-141 token standard.
+- Track intermediate payment states and mark an invoice **Paid only after the contract confirms settlement**.
+- Show the payer, payment time and transaction reference on the receipt.
+- Filter invoices, view collection/outstanding summaries and export the invoice register to CSV.
+- Import up to 200 students from a validated CSV, publish invoices in wallet-approved batches, and export the resulting payment links.
+- Provide a public Demo route so judges can inspect the interface without signing in.
 
-## Try the live prototype
+## Judge quickstart
 
-Open **https://studentfee-weld.vercel.app** to inspect the deployed interface. The prototype uses NEAR Testnet.
+You can inspect the product without connecting a wallet:
 
-**Public Demo:** open [the Demo page](https://studentfee-weld.vercel.app/demo) to explore clearly labelled sample students, invoices and statuses without connecting a wallet. Sample records are illustrative only; they are not stored on-chain and cannot be paid. To try a real payment, use a live invoice link supplied by the project team and your own NEAR Testnet wallet with testnet USDC. Administrator actions remain restricted to the project owner's wallet, `mouseng20.testnet`; its private key is not public and must never be requested or shared.
+1. Open the [live StudentFee app](https://studentfee-weld.vercel.app).
+2. Select **Explore Demo** or open the [public Demo page](https://studentfee-weld.vercel.app/demo).
+3. Review the sample fee register, invoice fields and public testnet invoice workflow.
+4. To exercise the real Testnet flow, use the Demo page's **Create a live test invoice** form. Connect a NEAR Testnet wallet, enter a student, term, amount and future due date, then approve invoice creation. The creator wallet pays the contract's storage deposit.
+5. Copy the generated invoice link and open it from a second wallet with testnet USDC. Approve the USDC transfer, select **Finish payment**, and wait until the receipt displays **Paid**. Follow the transaction reference to the NEAR Testnet explorer.
 
-### Administrator workflow (owner-authorized)
+**Important distinction:** the three rows in the Demo page's example fee register are static sample data. They are illustrative UI records, not on-chain invoices and cannot be paid. The live invoice form on that same page creates a separate invoice on the public Demo contract. The public Demo is testnet-only and is not the school's private admin workspace.
 
-1. The project owner opens [the administrator workspace](https://studentfee-weld.vercel.app/admin).
-2. The owner connects `mouseng20.testnet` and signs in by approving the wallet's message-signing request.
-3. The owner chooses **New invoice**, enters the student, term, amount and due date, then approves the on-chain invoice creation.
-4. The owner copies the generated payment link and shares it with the parent.
-5. For a class or school-wide upload, choose **Import CSV**, download the template, fill in Student Name, Term, Fee (USDC) and Due Date (Student ID and Note are optional), then upload and review the validation preview.
-6. Choose **Generate invoices and payment links**. The app publishes up to five individual invoices per wallet transaction and verifies each batch against the v2 contract. Download the resulting payment-links CSV to share with parents. If a batch is interrupted, inspect the saved drafts in the invoice list before retrying; do not upload the same file again.
-7. The dashboard shows invoice status and transaction details; **Export CSV** downloads the invoice register.
+If you do not have testnet USDC, you can still inspect the public interface and follow the recorded demo video linked from the project's hackathon post when it is published. Do not send real funds.
 
-### Parent payment flow (with a supplied invoice link)
+## Main application workflows
 
-1. Open the invoice payment link supplied by the school.
-2. Review the student, term, amount and due date.
-3. Connect your own NEAR Testnet wallet and approve the USDC transfer.
-4. After the first transaction, choose **Finish payment** and approve the settlement transaction.
-5. Wait for contract confirmation. The receipt shows the payer, timestamp and transaction reference; the invoice is marked **Paid** only after settlement is confirmed.
+### School administrator (project-owner access)
 
-**Important:** Payment uses two wallet approvals: one for the USDC transfer and one to finish settlement. A successful token transfer alone does not mean the invoice is Paid. If the parent closes the page between the two steps, the payment can be resumed from the payment page or dashboard.
+1. Open the [administrator workspace](https://studentfee-weld.vercel.app/admin).
+2. Connect the authorized administrator account, `mouseng20.testnet`, and approve the wallet's message-signing request.
+3. Select **New invoice**, enter the student, term, amount and due date, and approve the on-chain invoice creation.
+4. Copy the generated payment link and share it with the parent.
+5. To create a class batch, select **Import CSV**, download the template, fill in Student Name, Term, Fee (USDC) and Due Date (Student ID and Note are optional), then upload the file and review the validation preview.
+6. Select **Generate invoices and payment links**. The app publishes up to five individual invoices per wallet transaction and verifies each batch against the v2 contract. Download the payment-links CSV. If a batch is interrupted, inspect saved drafts before retrying; do not upload the same file again.
+7. Review invoice status and transaction details. Select **Export CSV** to download the invoice register.
 
-If you only want to inspect the interface, open the public [Demo page](https://studentfee-weld.vercel.app/demo); no wallet connection is needed. Wallet and payment actions require a compatible NEAR Testnet wallet and testnet USDC.
+The administrator workspace is intentionally restricted. No shared admin credentials, private keys or seed phrases are provided to judges.
 
-## NEAR integration
+### Parent payment (using an invoice link)
 
-Bulk import uses the same existing `create_invoice` method as manual invoice creation. It does not change or redeploy the contract; it creates one on-chain invoice per student. The current submission uses the existing Standard v2 contract:
+1. Open the payment link supplied by the school.
+2. Check the student, term, amount and due date.
+3. Connect a NEAR Testnet wallet and approve the USDC transfer.
+4. Select **Finish payment** and approve the separate settlement call.
+5. Wait for on-chain confirmation. The receipt shows the payer, timestamp and transaction reference. The invoice becomes **Paid** only after the settlement callback confirms success.
 
-- **Network:** NEAR Testnet
-- **Contract:** `v2.studentfee.testnet`
-- **Admin account:** `mouseng20.testnet`
-- **USDC:** NEP-141 testnet token, 6 decimals
-- **Contract source and deployed configuration:** see [docs/near-contract-integration.md](docs/near-contract-integration.md).
+Payment has two on-chain stages. A successful USDC transfer alone does **not** mean the invoice is Paid. If the parent closes the page after the transfer, the payment can be resumed from the payment page or dashboard.
 
-The payment flow is:
+## How NEAR is used
 
-1. The administrator creates an invoice on the contract.
-2. The parent calls `ft_transfer_call` on the USDC token with the invoice ID.
-3. The contract records the incoming payment.
-4. `settle_invoice` transfers the funds to the configured treasury.
-5. The invoice becomes Paid only when the settlement callback confirms success.
+StudentFee fits the **Real-World Money** track because it brings school invoicing and stablecoin collection onto NEAR using a deployed NEAR smart contract and NEP-141 USDC.
 
-The backend stores application data and sessions in PostgreSQL. It does not custody wallet private keys or sign payment transactions on behalf of users.
+The project has two separate Testnet contract contexts:
+
+| Purpose | Contract | Access |
+| --- | --- | --- |
+| School's Standard v2 invoice workflow | `v2.studentfee.testnet` | Authorized school administrator creates and manages invoices |
+| Public, permissionless demo invoice workflow | `demo.studentfee.testnet` | Any NEAR Testnet wallet can create a demo invoice, subject to contract limits |
+
+The configured USDC token is a NEP-141 Testnet token with 6 decimal places. See [the deployed contract reference](docs/near-contract-integration.md) and [the public Demo contract notes](contracts/near-demo/README.md) for contract details.
+
+### Settlement sequence
+
+1. The administrator or demo creator creates an invoice on the relevant NEAR contract.
+2. The parent calls `ft_transfer_call` on the configured USDC token, passing the invoice ID to the invoice contract.
+3. The contract records the received payment.
+4. `settle_invoice` transfers the USDC to the configured treasury.
+5. The invoice becomes **Paid** only when the settlement callback confirms success. If settlement fails, the contract keeps the payment in a recoverable intermediate state rather than falsely marking it Paid.
+
+The application backend uses PostgreSQL for invoice metadata and sessions. It does not custody wallet private keys or sign payment transactions for users.
+
+### Track scope and deliberate limitations
+
+The hackathon's [Real-World Money track](https://github.com/nearai/near-hackathon-prompt-examples/blob/main/tracks/08-realworld.md) lists NEAR Intents, stablecoins and meta-transactions as themes to consider. StudentFee currently uses **NEP-141 USDC directly on NEAR Testnet** and its own NEAR invoice contracts. It does **not** currently use the 1Click API, cross-chain NEAR Intents routing or a meta-transaction relayer. Wallet users approve their own transactions and pay their own Testnet gas. These are current product limitations, not features to assume.
+
+The official [NEAR HACKATHON instructions](https://nearhackathon.com/HACKATHON.md) state that the listed integrations are hints rather than mandatory requirements (Q-011) and that a fitting NEAR contract is sufficient. StudentFee's core implementation is a school invoicing and stablecoin-payment workflow on NEAR.
 
 ## Technology
 
 - React 18, Vite, TypeScript and Tailwind CSS
 - NEAR Wallet Selector
-- NEAR Rust contract and NEP-141 USDC
+- Rust smart contracts on NEAR and NEP-141 USDC
 - Vercel serverless API routes
 - PostgreSQL (Neon through the Vercel Marketplace)
-- Bun for package management and local development
+- Bun for package management and development
 
-## Known limitations and honest scope
+The project was built primarily with Arc Studio for rapid prototyping; the NEAR contracts were separately implemented and deployed by the project owner.
 
-- The app is deployed for **NEAR Testnet only**. Do not use real funds.
-- Simultaneous payments for the same invoice from two parents at the exact same moment have not been tested.
-- NEAR Mobile Android integration is wired in but has not been verified on a physical device; see [docs/near-mobile.md](docs/near-mobile.md).
-- The current submission is the Standard v2 experience. The separate Multi-school v3 work is still under development and is not part of the deployed payment flow.
-- This prototype has not had an independent security audit and is not presented as production-ready financial infrastructure.
-- No private keys or wallet seed phrases should be entered into the app.
+## Local development and verification
 
-## Run locally
+Prerequisites: Bun, Docker (for PostgreSQL), and a NEAR Testnet wallet with testnet USDC if you want to exercise wallet/payment flows.
 
-Prerequisites: Bun, PostgreSQL and a NEAR Testnet account holding testnet USDC.
+1. Install dependencies:
 
-```bash
-bun install
-docker run -d --name fees-pg \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=fees \
-  -p 5432:5432 postgres:18-alpine
-echo 'DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/fees' >> .env
-bun run dev
-```
+   ```bash
+   bun install
+   ```
 
-The web app runs on port 5173 and the API on port 8787. Tables are created automatically on first use.
+2. Start PostgreSQL:
 
-Useful commands:
+   ```bash
+   docker run -d --name fees-pg \
+     -e POSTGRES_PASSWORD=postgres \
+     -e POSTGRES_DB=fees \
+     -p 5432:5432 postgres:18-alpine
+   ```
 
-- `bun run build` — production frontend build
+3. Create a local `.env` file containing the server-side database connection:
+
+   ```bash
+   DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/fees
+   ```
+
+4. Start the app (Vite starts the API server alongside the frontend):
+
+   ```bash
+   bun run dev
+   ```
+
+5. Open http://localhost:5173. The Vite development server proxies `/api` requests to the local API on port 8787.
+
+Useful checks:
+
 - `bun run typecheck` — TypeScript check
-- `bun run check` — project lint/type-check script
+- `bun run build` — production frontend build
+- `bun run check` — repository check script
 - `bun run db:migrate` — apply database migrations manually
 
 ### Environment variables
 
 - `DATABASE_URL` — PostgreSQL connection string (required, server-side only)
 - `NEAR_RPC_URL` — NEAR Testnet RPC endpoint (optional)
-- `CONTRACT_ID` — fee contract account (optional)
-- `USDC_TOKEN_ID` — USDC token account (optional)
-- `ADMIN_ACCOUNT` — school administrator account (optional)
+- `CONTRACT_ID` — Standard v2 fee contract account (optional)
+- `USDC_TOKEN_ID` — Testnet USDC token account (optional)
+- `ADMIN_ACCOUNT` — authorized school administrator account (optional)
 - `TREASURY_ACCOUNT` — school treasury account (optional)
 - `SCHOOL_NAME` — default school name (optional)
 
-Never commit `.env` files or expose `DATABASE_URL` in client-side code.
+Never commit `.env` files or expose database credentials in client-side code.
 
 ## Deployment
 
-See [docs/deploy-vercel.md](docs/deploy-vercel.md) for Vercel and PostgreSQL setup. After deployment, check `/api/health`; it should report that the database and v2 contract adapter are available.
+The live prototype is deployed on Vercel with PostgreSQL. See [Vercel deployment notes](docs/deploy-vercel.md). The health endpoint is available at `/api/health`; it should report database and contract-adapter health.
 
-## Project notes
+## Known limitations and safety
 
-- Built primarily with Arc Studio for rapid prototyping; the NEAR contract is separately implemented and deployed by the project owner.
-- No Arc Studio or Circle branding appears in the interface.
-- The interface uses friendly labels for some intermediate on-chain states while preserving the exact contract statuses internally.
+- Testnet only. Do not use real funds.
+- This prototype has not had an independent security audit and is not production-ready financial infrastructure.
+- Simultaneous payments for the same invoice at exactly the same time have not been tested.
+- NEAR Mobile Android integration is present but has not been verified on a physical device; see [docs/near-mobile.md](docs/near-mobile.md).
+- The current submission is the Standard v2 experience plus the separate public Demo contract. The Multi-school v3 work is not part of the deployed submission.
+- No private keys or wallet seed phrases should be entered into the app or committed to this repository.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
