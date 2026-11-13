@@ -322,8 +322,10 @@ export default function AdminPage() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight">Fee invoices</h1>
-            <p className="text-sm text-slate-600">Signed in as {near.config?.adminAccount}</p>
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-[.2em] text-[#71877b]">Finance overview <span className="mx-1 text-[#c0c6bc]">/</span> Live school collections</p>
+            <h1 className="font-display text-[26px] font-semibold tracking-tight text-[#17251f] sm:text-3xl">School finance overview</h1>
+            <p className="mt-1 text-sm text-slate-600">A clear view of billed fees, collections and outstanding balances.</p>
+            <p className="mt-1 text-[11px] text-slate-500">Signed in as {near.config?.adminAccount}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" busy={exporting} onClick={() => void exportCsv()}>
