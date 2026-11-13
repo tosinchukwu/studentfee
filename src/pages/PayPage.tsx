@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, ExternalLink, Printer, Wallet } from 'lucide-react'
 import { clsx } from 'clsx'
 import { toast } from 'sonner'
-import { api } from '../lib/api'
+import { ApiError, api } from '../lib/api'
 import { formatDate, formatDateTime, shortHash, txUrl } from '../lib/format'
 import { formatAmount, toBaseUnits } from '../lib/money'
 import { ftBalanceOf } from '../lib/rpc'
@@ -12,6 +12,25 @@ import type { InvoiceView } from '../lib/types'
 import { Button, Card, Notice, PageShell, Spinner, StatusBadge } from '../components/ui'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Retry briefly while NEAR RPC/indexers make the confirmed transaction available. */
+async function recordTxWithRetry(
+  id: string,
+  kind: 'payment' | 'settlement',
+  hash: string,
+  signerId: string,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      await api.recordTx(id, kind, hash, signerId)
+      return true
+    } catch (error) {
+      if (!(error instanceof ApiError) || (error.status !== 404 && error.status !== 409)) return false
+      if (attempt < 5) await sleep(2000)
+    }
+  }
+  return false
+}
 
 function Steps({ invoice }: { invoice: InvoiceView }) {
   const chain = invoice.chainStatus
@@ -159,14 +178,22 @@ export default function PayPage({ id }: { id: string }) {
       return
     }
     setBusy('paying')
+    const signerId = accountId
     try {
       payHash.current = await near.call(clientAdapter(invoice.contractVersion).pay(invoice, config))
       const next = await waitFor((v) => v.chainStatus !== 'Pending')
+      // Persist the wallet-returned transaction hash even if the status poll timed out.
+      // The API independently verifies the hash, signer, contract and invoice before saving it.
+      const referenceSaved = payHash.current
+        ? await recordTxWithRetry(id, 'payment', payHash.current, signerId)
+        : false
+      await refresh()
       if (!next || next.chainStatus === 'Pending') {
-        setError('We did not see your payment on the invoice. Nothing was kept. Please check your wallet and try again.')
-      } else if (payHash.current && next.payer === accountId) {
-        await api.recordTx(id, 'payment', payHash.current, accountId).catch(() => undefined)
-        await refresh()
+        setError('Your wallet submitted the payment, but the invoice is still waiting for network confirmation. Refresh this page shortly; do not pay again.')
+      } else if (next.payer !== signerId) {
+        setError('The network payment is recorded, but the payer account did not match this connected wallet. Please contact the school office.')
+      } else if (!referenceSaved) {
+        toast.error('Payment is confirmed, but its transaction reference is still syncing. Refresh the receipt shortly.')
       }
     } catch (e) {
       setError(friendlyError(e))
@@ -345,17 +372,21 @@ export default function PayPage({ id }: { id: string }) {
                   <dd className="break-all">{invoice.payer}</dd>
                 </>
               )}
-              <dt className="text-slate-600">Reference</dt>
+              <dt className="text-slate-600">Blockchain transaction</dt>
               <dd className="break-all">
                 {invoice.paymentTx ? (
                   <a className="inline-flex items-center gap-1 text-brand-700 underline" href={txUrl(config, invoice.paymentTx)} target="_blank" rel="noopener noreferrer">
                     {shortHash(invoice.paymentTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                   </a>
+                ) : invoice.settlementTx ? (
+                  <a className="inline-flex items-center gap-1 text-brand-700 underline" href={txUrl(config, invoice.settlementTx)} target="_blank" rel="noopener noreferrer">
+                    {shortHash(invoice.settlementTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                  </a>
                 ) : (
-                  <span>Recorded on the network (invoice {shortHash(invoice.id)})</span>
+                  <span className="text-amber-700">Transaction hash is still syncing. Refresh this receipt shortly.</span>
                 )}
               </dd>
-              {invoice.settlementTx && (
+              {invoice.settlementTx && invoice.paymentTx && (
                 <>
                   <dt className="text-slate-600">Settlement</dt>
                   <dd className="break-all"><a className="inline-flex items-center gap-1 text-brand-700 underline" href={txUrl(config, invoice.settlementTx)} target="_blank" rel="noopener noreferrer">{shortHash(invoice.settlementTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden /></a></dd>

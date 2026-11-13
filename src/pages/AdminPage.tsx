@@ -308,7 +308,7 @@ export default function AdminPage() {
   const schoolName = near.config?.schoolName ?? 'School fees'
   if (!authed) {
     return (
-      <PageShell schoolName={schoolName}>
+      <PageShell schoolName={schoolName} showDisconnect={false}>
         <SignIn onSignedIn={() => setAuthed(true)} />
       </PageShell>
     )
