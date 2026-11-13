@@ -34,7 +34,6 @@ async function recordTxWithRetry(
 
 function Steps({ invoice }: { invoice: InvoiceView }) {
   const chain = invoice.chainStatus
-  const paymentTx = invoice.paymentTx ?? paymentHash
   const sentDone = chain !== null && chain !== 'Pending' && chain !== 'Cancelled'
   const finished = chain === 'Paid'
   const steps = [
@@ -250,6 +249,7 @@ export default function PayPage({ id }: { id: string }) {
   }
 
   const chain = invoice.chainStatus
+  const paymentTx = invoice.paymentTx ?? paymentHash
   return (
     <PageShell schoolName={invoice.schoolName} right={wallet}>
       <div className="mx-auto max-w-2xl space-y-4 sm:space-y-5">
