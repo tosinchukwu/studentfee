@@ -17,7 +17,7 @@ export default function AdminWorkspace({ schoolName, accountId, onSignOut, onDis
   children: ReactNode
 }) {
   return (
-    <div className="min-h-dvh bg-[#0b1426] text-slate-100">
+    <div className="min-h-dvh w-full min-w-0 bg-[#0b1426] text-slate-100">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/[.07] bg-[#0d192e] text-white lg:flex">
         <a href="/" className="flex h-20 items-center gap-3 border-b border-white/[.08] px-6">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-400 text-[#10213b]"><GraduationCap className="h-6 w-6" /></span>
@@ -43,7 +43,7 @@ export default function AdminWorkspace({ schoolName, accountId, onSignOut, onDis
           <button type="button" onClick={onDisconnectWallet} className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm text-slate-400 hover:bg-white/[.06] hover:text-white"><Unplug className="h-4 w-4" /> Disconnect wallet</button>
         </div>
       </aside>
-      <div className="lg:pl-64">
+      <div className="w-full min-w-0 lg:pl-64">
         <header className="sticky top-0 z-30 border-b border-white/[.08] bg-[#0d192e]/95 backdrop-blur-xl">
           <div className="mx-auto flex min-h-[76px] max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-7">
             <div className="min-w-0">
@@ -61,7 +61,7 @@ export default function AdminWorkspace({ schoolName, accountId, onSignOut, onDis
             {items.map(({ label, href }, index) => <a key={label} href={href} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-semibold ${index === 0 ? 'bg-teal-300/10 text-teal-200' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{label}</a>)}
           </nav>
         </header>
-        <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-7 sm:py-8">{children}</main>
+        <main className="mx-auto w-full min-w-0 max-w-[1600px] px-4 py-6 sm:px-7 sm:py-8">{children}</main>
         <footer className="px-4 pb-7 text-center text-xs text-slate-500 sm:px-7">StudentFee · Transparent school fee payments on NEAR</footer>
       </div>
     </div>
