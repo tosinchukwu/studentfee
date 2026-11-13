@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, ArrowUpRight, CheckCircle2, Clock3, Download, FileText, Plus, Search, Upload, ShieldCheck, TriangleAlert, Wallet } from 'lucide-react'
+import { Activity, ArrowUpRight, CheckCircle2, Clock3, Download, ExternalLink, FileText, Plus, Search, Upload, ShieldCheck, TriangleAlert, Wallet } from 'lucide-react'
 import { clsx } from 'clsx'
 import { toast } from 'sonner'
 import { ApiError, api, session } from '../lib/api'
-import { copyText, formatDate } from '../lib/format'
+import { copyText, formatDate, shortHash, txUrl } from '../lib/format'
 import { formatAmount } from '../lib/money'
 import { clientAdapter } from '../lib/contracts'
 import { friendlyError, isAndroid, useNear } from '../lib/near'
@@ -405,7 +405,23 @@ export default function AdminPage() {
                 {recentInvoices.map((invoice) => (
                   <li key={invoice.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                     <div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{invoice.studentName}</p><p className="mt-1 truncate text-xs text-slate-500">{invoice.term} · {formatDate(invoice.createdAt)}</p></div>
-                    <div className="shrink-0 text-right"><p className="text-sm font-semibold tabular-nums text-ink">${formatAmount(invoice.amountBase)}</p><p className={clsx('mt-1 text-xs font-medium', invoice.status === 'Paid' ? 'text-emerald-700' : invoice.status === 'Overdue' ? 'text-rose-700' : 'text-slate-500')}>{invoice.status}</p></div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold tabular-nums text-[#17243b] opacity-100">${formatAmount(invoice.amountBase)}</p>
+                      <p className={clsx('mt-1 text-xs font-semibold', invoice.status === 'Paid' ? 'text-emerald-700' : invoice.status === 'Overdue' ? 'text-rose-700' : 'text-slate-600')}>{invoice.status}</p>
+                      {invoice.paymentTx ? (
+                        <a
+                          className="mt-1 inline-flex items-center justify-end gap-1 text-xs font-medium text-brand-700 underline"
+                          href={txUrl(near.config!, invoice.paymentTx)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`View transaction for ${invoice.studentName}`}
+                        >
+                          {shortHash(invoice.paymentTx)} <ExternalLink className="h-3 w-3" aria-hidden />
+                        </a>
+                      ) : invoice.status === 'Paid' && invoice.payer ? (
+                        <p className="mt-1 max-w-40 truncate text-xs text-slate-500">Paid by {invoice.payer}</p>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>
