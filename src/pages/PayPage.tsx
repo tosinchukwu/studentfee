@@ -20,13 +20,13 @@ async function recordTxWithRetry(
   hash: string,
   signerId: string,
 ): Promise<boolean> {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
     try {
       await api.recordTx(id, kind, hash, signerId)
       return true
     } catch (error) {
       if (!(error instanceof ApiError) || (error.status !== 404 && error.status !== 409)) return false
-      if (attempt < 5) await sleep(2000)
+      if (attempt < 29) await sleep(2000)
     }
   }
   return false
@@ -34,6 +34,7 @@ async function recordTxWithRetry(
 
 function Steps({ invoice }: { invoice: InvoiceView }) {
   const chain = invoice.chainStatus
+  const paymentTx = invoice.paymentTx ?? paymentHash
   const sentDone = chain !== null && chain !== 'Pending' && chain !== 'Cancelled'
   const finished = chain === 'Paid'
   const steps = [
@@ -110,6 +111,7 @@ export default function PayPage({ id }: { id: string }) {
   const [busy, setBusy] = useState<'paying' | 'settling' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [balanceOf, setBalanceOf] = useState<{ account: string; value: bigint } | null>(null)
+  const [paymentHash, setPaymentHash] = useState<string | null>(null)
   const balance = balanceOf && balanceOf.account === accountId ? balanceOf.value : null
   const payHash = useRef<string | null>(null)
 
@@ -181,6 +183,7 @@ export default function PayPage({ id }: { id: string }) {
     const signerId = accountId
     try {
       payHash.current = await near.call(clientAdapter(invoice.contractVersion).pay(invoice, config))
+      setPaymentHash(payHash.current)
       const next = await waitFor((v) => v.chainStatus !== 'Pending')
       // Persist the wallet-returned transaction hash even if the status poll timed out.
       // The API independently verifies the hash, signer, contract and invoice before saving it.
@@ -374,9 +377,9 @@ export default function PayPage({ id }: { id: string }) {
               )}
               <dt className="text-slate-600">Blockchain transaction</dt>
               <dd className="break-all">
-                {invoice.paymentTx ? (
-                  <a className="inline-flex items-center gap-1 text-brand-700 underline" href={txUrl(config, invoice.paymentTx)} target="_blank" rel="noopener noreferrer">
-                    {shortHash(invoice.paymentTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                {paymentTx ? (
+                  <a className="inline-flex items-center gap-1 text-brand-700 underline" href={txUrl(config, paymentTx)} target="_blank" rel="noopener noreferrer">
+                    {shortHash(paymentTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                   </a>
                 ) : invoice.settlementTx ? (
                   <a className="inline-flex items-center gap-1 text-brand-700 underline" href={txUrl(config, invoice.settlementTx)} target="_blank" rel="noopener noreferrer">
@@ -386,7 +389,7 @@ export default function PayPage({ id }: { id: string }) {
                   <span className="text-amber-700">Transaction hash is still syncing. Refresh this receipt shortly.</span>
                 )}
               </dd>
-              {invoice.settlementTx && invoice.paymentTx && (
+              {invoice.settlementTx && paymentTx && (
                 <>
                   <dt className="text-slate-600">Settlement</dt>
                   <dd className="break-all"><a className="inline-flex items-center gap-1 text-brand-700 underline" href={txUrl(config, invoice.settlementTx)} target="_blank" rel="noopener noreferrer">{shortHash(invoice.settlementTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden /></a></dd>
