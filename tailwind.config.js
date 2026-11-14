@@ -1,28 +1,12 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  theme: {
-    extend: {
-      fontFamily: {
-        sans: ['"DM Sans"', 'ui-sans-serif', 'sans-serif'],
-        display: ['"Space Grotesk"', '"DM Sans"', 'ui-sans-serif', 'sans-serif'],
-      },
-      colors: {
-        canvas: '#F4F7FA',
-        ink: '#17243B',
-        brand: {
-          50: '#EAF7F5',
-          100: '#D1EEE9',
-          500: '#279B91',
-          600: '#168176',
-          700: '#0F665F',
-          800: '#0B504B',
-        },
-      },
-      boxShadow: {
-        card: '0 2px 5px rgba(16,29,53,0.035), 0 12px 32px rgba(16,29,53,0.055)',
-      },
-    },
-  },
-  plugins: [],
+ content: ['./index.html','./src/**/*.{js,ts,jsx,tsx}'],
+ theme: { extend: {
+  fontFamily: { sans:['Inter','ui-sans-serif','sans-serif'], display:['"Space Grotesk"','Inter','ui-sans-serif','sans-serif'] },
+  colors: { canvas:'#05070A', ink:'#EDF2F7', mint:'#5EF2C4', muted:'#A6B3C0', brand:{50:'#10251f',100:'#17372e',500:'#5EF2C4',600:'#5EF2C4',700:'#5EF2C4',800:'#37dcae'} },
+  borderRadius:{glass:'20px'},
+  boxShadow:{card:'0 18px 60px rgba(0,0,0,.25)',glow:'0 0 60px rgba(45,212,191,.22)'},
+  animation:{'sf-float':'sf-float 7s ease-in-out infinite','sf-rise':'sf-rise .7s cubic-bezier(.2,.7,.2,1) both'}
+ }},
+ plugins:[]
 }
