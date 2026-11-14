@@ -3,9 +3,9 @@ export default {
  content: ['./index.html','./src/**/*.{js,ts,jsx,tsx}'],
  theme: { extend: {
   fontFamily: { sans:['Inter','ui-sans-serif','sans-serif'], display:['"Space Grotesk"','Inter','ui-sans-serif','sans-serif'], script:['"Great Vibes"','cursive'] },
-  colors: { canvas:'#05070A', ink:'#EDF2F7', mint:'#5EF2C4', ember:'#FF7900', 'ember-soft':'#FFAD68', muted:'#A6B3C0', brand:{50:'#10251f',100:'#17372e',500:'#5EF2C4',600:'#5EF2C4',700:'#5EF2C4',800:'#37dcae'} },
+  colors: { canvas:'#FFF4E9', ink:'#202B3A', mint:'#159B79', ember:'#FF7900', 'ember-soft':'#FFAD68', facebook:'#1877F2', muted:'#647184', brand:{50:'#FFF0E3',100:'#FFE0C2',500:'#FF7900',600:'#F06D00',700:'#FF7900',800:'#E96800'} },
   borderRadius:{glass:'20px'},
-  boxShadow:{card:'0 18px 60px rgba(0,0,0,.25)',glow:'0 0 60px rgba(45,212,191,.22)'},
+  boxShadow:{card:'0 18px 50px rgba(104,67,30,.09)',glow:'0 0 60px rgba(255,121,0,.18)'},
   animation:{'sf-float':'sf-float 7s ease-in-out infinite','sf-rise':'sf-rise .7s cubic-bezier(.2,.7,.2,1) both'}
  }},
  plugins:[]
