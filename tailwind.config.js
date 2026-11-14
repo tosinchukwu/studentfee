@@ -1,28 +1,14 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  theme: {
-    extend: {
-      fontFamily: {
-        sans: ['"DM Sans"', 'ui-sans-serif', 'sans-serif'],
-        display: ['"Space Grotesk"', '"DM Sans"', 'ui-sans-serif', 'sans-serif'],
-      },
-      colors: {
-        canvas: '#F4F7FA',
-        ink: '#17243B',
-        brand: {
-          50: '#EAF7F5',
-          100: '#D1EEE9',
-          500: '#279B91',
-          600: '#168176',
-          700: '#0F665F',
-          800: '#0B504B',
-        },
-      },
-      boxShadow: {
-        card: '0 2px 5px rgba(16,29,53,0.035), 0 12px 32px rgba(16,29,53,0.055)',
-      },
+  theme: { extend: {
+    fontFamily: { sans:['"DM Sans"','ui-sans-serif','sans-serif'], display:['"Space Grotesk"','"DM Sans"','ui-sans-serif','sans-serif'] },
+    colors: {
+      canvas:'#FFF8F0', ink:'#17243B',
+      brand:{50:'#FFF1E4',100:'#FFE1C5',500:'#FF922E',600:'#FF7900',700:'#E66D00',800:'#C85B00'},
+      ember:'#FF7900', facebook:'#1877F2', navy:'#172B4D'
     },
-  },
-  plugins: [],
+    boxShadow:{card:'0 2px 5px rgba(23,43,77,.035),0 12px 32px rgba(23,43,77,.07)'}
+  }},
+  plugins:[],
 }
