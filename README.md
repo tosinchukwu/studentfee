@@ -165,7 +165,6 @@ The live prototype is deployed on Vercel with PostgreSQL. See [Vercel deployment
 - Testnet only. Do not use real funds.
 - This prototype has not had an independent security audit and is not production-ready financial infrastructure.
 - Simultaneous payments for the same invoice at exactly the same time have not been tested.
-- NEAR Mobile Android integration is present but has not been verified on a physical device; see [docs/near-mobile.md](docs/near-mobile.md).
 - The current submission is the Standard v2 experience plus the separate public Demo contract. The Multi-school v3 work is not part of the deployed submission.
 - No private keys or wallet seed phrases should be entered into the app or committed to this repository.
 

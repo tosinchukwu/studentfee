@@ -1,6 +1,6 @@
 # NEAR Mobile (Android): integration notes and test plan
 
-Status: wired in, NOT yet verified with the installed NEAR Mobile Android app. Do not treat it as supported until the checklist below passes on a real phone.
+Status: the StudentFee wallet/payment flow has been tested by the project owner on a physical Android device using Meteor Wallet. The separate NEAR Mobile-specific hand-off integration is wired in, but has not been verified with the installed NEAR Mobile Android app.
 
 ## Network question (testnet)
 The website's `network: "testnet"` does not change the wallet. It only tells the NEAR Mobile relay which network the request is for.
@@ -11,7 +11,7 @@ The website's `network: "testnet"` does not change the wallet. It only tells the
 - **Account check added to our site:** after any wallet connects, the site asks the testnet RPC whether the account exists there and signs it out with a message if not. (Mainnet-only or unfunded accounts fail it. Also note the treasury account `bd73...6669` does not exist on testnet yet: it can receive USDC, but needs a little testnet NEAR before it can spend or move it.)
 
 ## Recommended mobile wallet for testnet
-Meteor Wallet: its listing in HOT Connect's wallet manifest marks testnet and mainnet both supported, with signMessage, on Android, iOS and web, and it is already in our wallet list. MyNearWallet's testnet web wallet (testnet.mynearwallet.com) also works in a phone browser. Neither has been tested on a phone by us.
+Meteor Wallet has been used by the project owner to test the StudentFee wallet/payment flow on a physical Android device. MyNearWallet's testnet web wallet (`testnet.mynearwallet.com`) is another option for use in a phone browser.
 
 ## What was checked from source and the network
 | Check | Result |
@@ -26,11 +26,11 @@ Meteor Wallet: its listing in HOT Connect's wallet manifest marks testnet and ma
 | Request metadata | The relay rejects the whole request unless the app name logo and URL are valid public https URLs. On localhost or http they are omitted |
 | HOT Connect (`@hot-labs/near-connect` 0.12.0) | Rejected: its manifest lists NEAR Mobile with `"testnet": false`, and a public bug report describes NEAR Mobile failing to connect through HOT Connect on iOS and Android |
 
-## What is not verified (needs the phone)
-1. The Approve button actually launches the app from Android Chrome.
-2. The app shows testnet requests (the app must be switched to testnet) and approves them.
+## What is not verified (NEAR Mobile-specific; needs that app)
+1. The Approve button actually launches NEAR Mobile from Android Chrome.
+2. NEAR Mobile shows testnet requests (the app must be switched to testnet) and approves them.
 3. The site resumes and detects the account when you switch back to the browser.
-4. Signing: `ft_transfer_call` on USDC (needs approval in the app each time), `settle_invoice` (may be signed silently with the limited key) and the admin sign-in message.
+4. Signing through NEAR Mobile: `ft_transfer_call` on USDC (needs approval in the app each time), `settle_invoice` (may be signed silently with the limited key) and the admin sign-in message.
 5. The admin account `mouseng20.testnet` must exist inside NEAR Mobile (imported). The admin sign-in only accepts that account.
 
 ## Behaviour in the app
