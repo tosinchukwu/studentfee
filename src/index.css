@@ -2,104 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
-}
-
-html {
-  width: 100%;
-  min-width: 320px;
-  scroll-behavior: smooth;
-}
-
-body,
-#root {
-  width: 100%;
-  min-width: 320px;
-}
-
-body {
-  overflow-x: clip;
-}
-
-body {
-  margin: 0;
-  font-family: 'DM Sans', ui-sans-serif, sans-serif;
-  color: #17243b;
-  background: #f4f7fa;
-  min-height: 100dvh;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-
-button,
-input {
-  font: inherit;
-}
-
-::selection {
-  color: #fff;
-  background: #0f5f5b;
-}
-
+:root { color-scheme: light; --sf-orange:#FF7900; --sf-cream:#FFF8F0; --sf-blue:#1877F2; --sf-navy:#172B4D; }
+* { box-sizing: border-box; }
+html { width:100%; min-width:320px; scroll-behavior:smooth; background:var(--sf-cream); }
+body,#root { width:100%; min-width:320px; }
+body { margin:0; overflow-x:clip; font-family:'DM Sans',ui-sans-serif,sans-serif; color:#17243b; background:var(--sf-cream); min-height:100dvh; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+button,input { font:inherit; }
+::selection { color:#fff; background:var(--sf-orange); }
 @layer components {
-  .field {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-ink placeholder:text-slate-400 transition focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-100;
-    min-height: 44px;
-  }
-  .label {
-    @apply mb-1.5 block text-sm font-semibold text-slate-700;
-  }
+ .field { @apply w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-ink placeholder:text-slate-400 transition focus:outline-none focus:ring-4; min-height:44px; }
+ .field:focus { border-color:var(--sf-orange); --tw-ring-color:rgba(255,121,0,.16); }
+ .label { @apply mb-1.5 block text-sm font-semibold text-slate-700; }
 }
-
-@media print {
-  .no-print {
-    display: none !important;
-  }
-  body {
-    background: white;
-  }
-}
-
-/* Keep the wallet picker above page content and readable on small screens. */
-.nws-modal-wrapper {
-  z-index: 60;
-}
-
-
-/* Clean, print-ready payment receipt layout. */
-@page {
-  size: A4;
-  margin: 16mm;
-}
-
-@media print {
-  html, body {
-    min-height: auto;
-    background: #fff !important;
-    color: #111827 !important;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-  }
-  body * {
-    visibility: hidden;
-  }
-  body .receipt-print,
-  body .receipt-print * {
-    visibility: visible;
-  }
-  body .receipt-print {
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 100%;
-    border: 1px solid #dbe3ec !important;
-    border-radius: 16px !important;
-    box-shadow: none !important;
-    background: #fff !important;
-    color: #111827 !important;
-  }
-  body .receipt-print a {
-    color: #0f766e !important;
-    text-decoration: none !important;
-  }
-}
+.sf-hero { background:radial-gradient(ellipse at 78% 45%,rgba(24,119,242,.38),transparent 35%),linear-gradient(118deg,#172B4D 0%,#203D68 58%,#164B87 100%); }
+.sf-orb { position:absolute; border-radius:9999px; filter:blur(2px); pointer-events:none; }
+.sf-orb-one { width:22rem;height:22rem;right:4%;top:-11rem;background:rgba(255,121,0,.2); }
+.sf-orb-two { width:18rem;height:18rem;right:28%;bottom:-14rem;background:rgba(24,119,242,.28); }
+.sf-school-card { position:relative;height:290px;border:1px solid rgba(255,255,255,.25);border-radius:28px;background:linear-gradient(150deg,rgba(255,255,255,.2),rgba(255,255,255,.07));backdrop-filter:blur(10px);overflow:hidden;box-shadow:0 28px 70px rgba(4,16,38,.28); }
+.sf-school-sun { position:absolute;width:140px;height:140px;border-radius:50%;background:#FF9A3D;right:35px;top:22px;opacity:.95; }
+.sf-school-building { position:absolute;left:12%;right:10%;bottom:35px;height:175px;background:#FFF0DF;border-radius:12px 12px 5px 5px;box-shadow:0 12px 30px rgba(10,25,50,.18); }
+.sf-school-roof { position:absolute;left:8%;right:6%;bottom:207px;height:28px;background:#FF7900;clip-path:polygon(50% 0,100% 100%,0 100%); }
+.sf-school-sign { position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:2px;font-weight:900;color:#172B4D;white-space:nowrap; }
+.sf-school-sign span { color:#FF7900; }
+.sf-school-windows { position:absolute;top:54px;left:18px;right:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px; }
+.sf-school-windows i { height:40px;border:4px solid #fff;background:#8EC7F4;border-radius:5px;box-shadow:inset 0 -9px rgba(24,119,242,.12); }
+.sf-school-door { position:absolute;bottom:0;left:calc(50% - 22px);width:44px;height:62px;border-radius:7px 7px 0 0;background:#1877F2;border:4px solid #fff;border-bottom:0; }
+.sf-school-ground { position:absolute;bottom:0;left:0;right:0;height:38px;background:linear-gradient(#8CCB88,#4B9D67); }
+.sf-float-card { position:absolute;display:flex;align-items:center;gap:10px;padding:12px 15px;border:1px solid rgba(255,255,255,.8);border-radius:16px;background:#fff;color:#172B4D;box-shadow:0 15px 35px rgba(6,20,44,.2);animation:sf-float 5s ease-in-out infinite; }
+.sf-float-card b,.sf-float-card small { display:block; }.sf-float-card b{font-size:12px}.sf-float-card small{margin-top:3px;font-size:10px;color:#64748b}
+.sf-float-top { top:26px;right:-2px; }.sf-float-bottom { bottom:20px;left:-18px;animation-delay:-2.3s; }
+.sf-check,.sf-mini-icon { display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:#E9F8EF;color:#159B59;font-weight:900; }.sf-mini-icon{background:#FFF0DF;color:#D65D00}
+@keyframes sf-float { 0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)} }
+@media(prefers-reduced-motion:reduce){.sf-float-card{animation:none}html{scroll-behavior:auto}}
+@media print { .no-print{display:none!important} body{background:#fff} html,body{min-height:auto;background:#fff!important;color:#111827!important;print-color-adjust:exact;-webkit-print-color-adjust:exact} body *{visibility:hidden} body .receipt-print,body .receipt-print *{visibility:visible} body .receipt-print{position:absolute;inset:0 auto auto 0;width:100%;border:1px solid #dbe3ec!important;border-radius:16px!important;box-shadow:none!important;background:#fff!important;color:#111827!important} body .receipt-print a{color:#1877F2!important;text-decoration:none!important} }
+@page { size:A4;margin:16mm; }
+.nws-modal-wrapper { z-index:60; }
