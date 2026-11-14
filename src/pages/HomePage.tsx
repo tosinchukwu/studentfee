@@ -21,34 +21,32 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
   return (
     <PageShell schoolName={schoolName}>
       <div className="space-y-8 pb-10 sm:space-y-10">
-        <section className="sf-hero relative isolate overflow-hidden rounded-[2rem] px-6 py-10 text-white shadow-xl sm:px-10 sm:py-14 lg:px-14">
+        <section className="sf-hero relative isolate min-h-[650px] overflow-hidden rounded-[2rem] px-6 py-10 text-white shadow-xl sm:px-10 sm:py-14 lg:min-h-[620px] lg:px-14 lg:py-16">
+          <img src="/images/studentfee-hero.jpg" alt="A smiling student standing in front of his school building" className="sf-hero-photo" />
+          <div className="sf-hero-shade" />
           <div className="sf-orb sf-orb-one" /><div className="sf-orb sf-orb-two" />
-          <div className="relative z-10 max-w-3xl">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold tracking-wide text-orange-100">
+          <div className="relative z-10 max-w-2xl lg:max-w-[54%]">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/25 bg-[#172B4D]/55 px-3 py-1.5 text-xs font-bold tracking-wide text-orange-100 backdrop-blur-md">
               <span className="h-2 w-2 rounded-full bg-[#FF7900] shadow-[0_0_12px_#FF7900]" /> SCHOOL FEES, MADE CLEAR
             </div>
             <h1 className="max-w-2xl font-display text-4xl font-bold leading-[1.06] tracking-tight sm:text-5xl lg:text-6xl">
               School payments,<br /><span className="text-[#FF9A3D]">without the confusion.</span>
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-7 text-blue-50/90 sm:text-lg">A simpler way for schools to collect fees and for parents to pay with confidence. One payment link, a clear record, and on-chain verification.</p>
+            <p className="mt-5 max-w-xl text-base leading-7 text-blue-50/95 sm:text-lg">A simpler way for schools to collect fees and for parents to pay with confidence. One payment link, a clear record, and on-chain verification.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/demo" className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#FF7900] px-5 text-sm font-bold text-white shadow-lg shadow-orange-950/20 transition hover:-translate-y-0.5 hover:bg-[#F06D00]">Explore live demo <ArrowRight className="h-4 w-4" /></Link>
-              <a href="#pay-fee" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/15">Pay a school fee</a>
+              <a href="#pay-fee" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/30 bg-[#172B4D]/45 px-5 text-sm font-semibold text-white backdrop-blur-md transition hover:bg-[#172B4D]/65">Pay a school fee</a>
             </div>
-            <div className="mt-8 flex flex-wrap gap-x-5 gap-y-3 text-xs font-semibold text-blue-50/90 sm:text-sm">
+            <div className="mt-8 flex flex-wrap gap-x-5 gap-y-3 text-xs font-semibold text-blue-50/95 sm:text-sm">
               <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#FF9A3D]" /> Verifiable payments</span>
               <span className="inline-flex items-center gap-2"><WalletCards className="h-4 w-4 text-[#FF9A3D]" /> USDC on NEAR</span>
               <span className="inline-flex items-center gap-2"><ReceiptText className="h-4 w-4 text-[#FF9A3D]" /> Digital receipts</span>
             </div>
           </div>
-          <div className="sf-hero-art relative z-10 mx-auto mt-8 block w-full max-w-md lg:absolute lg:right-[-1rem] lg:top-1/2 lg:mt-0 lg:w-[48%] lg:max-w-none lg:-translate-y-1/2">
-            <div className="relative overflow-visible rounded-[1.75rem]">
-              <img src="/images/studentfee-hero.png" alt="A student standing proudly in front of a school building" className="block w-full rounded-[1.75rem] object-cover shadow-2xl ring-4 ring-white/70" />
-              <div className="sf-float-card sf-float-top"><span className="sf-check">✓</span><span><b>Payment confirmed</b><small>Verified on NEAR</small></span></div>
-              <div className="sf-float-card sf-float-bottom"><span className="sf-mini-icon">₦</span><span><b>Every fee, in view</b><small>Clear records for everyone</small></span></div>
-            </div>
-          </div>
-          <div className="sf-hero-bottom absolute bottom-0 right-0 hidden h-2 w-1/3 rounded-tl-full bg-[#FF7900] lg:block" />
+          <div className="sf-float-card sf-float-top"><span className="sf-check">✓</span><span><b>Payment confirmed</b><small>Verified on NEAR</small></span></div>
+          <div className="sf-float-card sf-float-bottom"><span className="sf-mini-icon">₦</span><span><b>Every fee, in view</b><small>Clear records for everyone</small></span></div>
+          <div className="sf-hero-caption"><span className="sf-caption-dot" /> A clearer school-fee experience</div>
+          <div className="sf-hero-bottom absolute bottom-0 right-0 h-2 w-1/3 rounded-tl-full bg-[#FF7900]" />
         </section>
 
         <section className="sf-demo-banner rounded-2xl border border-orange-200 bg-[#FFF0DF] p-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
