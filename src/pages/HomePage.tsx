@@ -41,7 +41,7 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
               <span className="inline-flex items-center gap-2"><ReceiptText className="h-4 w-4 text-[#FF9A3D]" /> Digital receipts</span>
             </div>
           </div>
-          <div className="sf-hero-art absolute right-[-1rem] top-1/2 hidden w-[48%] -translate-y-1/2 lg:block">
+          <div className="sf-hero-art relative z-10 mx-auto mt-8 block w-full max-w-md lg:absolute lg:right-[-1rem] lg:top-1/2 lg:mt-0 lg:w-[48%] lg:max-w-none lg:-translate-y-1/2">
             <div className="relative overflow-visible rounded-[1.75rem]">
               <img src="/images/studentfee-hero.png" alt="A student standing proudly in front of a school building" className="block w-full rounded-[1.75rem] object-cover shadow-2xl ring-4 ring-white/70" />
               <div className="sf-float-card sf-float-top"><span className="sf-check">✓</span><span><b>Payment confirmed</b><small>Verified on NEAR</small></span></div>
