@@ -3,30 +3,31 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  --sf-bg: #05070a;
-  --sf-panel: rgba(255,255,255,.05);
-  --sf-border: rgba(255,255,255,.12);
-  --sf-text: #edf2f7;
-  --sf-muted: #a6b3c0;
-  --sf-mint: #5ef2c4;
+  color-scheme: light;
+  --sf-bg: #fff4e9;
+  --sf-panel: rgba(255,255,255,.82);
+  --sf-border: rgba(120,75,35,.14);
+  --sf-text: #202b3a;
+  --sf-muted: #647184;
+  --sf-mint: #159b79;
   --sf-orange: #ff7900;
   --sf-orange-soft: #ffad68;
-  --sf-warning: #fbbf77;
-  --sf-danger: #f28b91;
+  --sf-blue: #1877f2;
+  --sf-warning: #b86a13;
+  --sf-danger: #c43e48;
   --sf-radius: 20px;
 }
 * { box-sizing: border-box; }
 html { width:100%; min-width:320px; scroll-behavior:smooth; background:var(--sf-bg); }
 body,#root { width:100%; min-width:320px; min-height:100dvh; }
-body { margin:0; overflow-x:clip; font-family:'Inter',ui-sans-serif,sans-serif; color:var(--sf-text); background:var(--sf-bg); -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+body { margin:0; overflow-x:clip; font-family:'Inter',ui-sans-serif,sans-serif; color:var(--sf-text); background:radial-gradient(ellipse at 8% 0%,rgba(255,121,0,.13),transparent 34rem),radial-gradient(ellipse at 100% 12%,rgba(24,119,242,.07),transparent 32rem),var(--sf-bg); -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
 button,input { font:inherit; }
 ::selection { color:#05070a; background:var(--sf-mint); }
 @layer components {
  .field { @apply w-full rounded-xl px-3 text-base transition focus:outline-none focus:ring-2; min-height:46px; color:var(--sf-text); background:rgba(255,255,255,.055); border:1px solid var(--sf-border); }
- .field::placeholder { color:#778694; }
+ .field::placeholder { color:#8993a0; }
  .field:focus { border-color:var(--sf-mint); --tw-ring-color:rgba(94,242,196,.18); }
- .label { @apply mb-1.5 block text-sm font-semibold; color:#c5d0d9; }
+ .label { @apply mb-1.5 block text-sm font-semibold; color:#526174; }
  .sf-glass { background:var(--sf-panel); border:1px solid var(--sf-border); border-radius:var(--sf-radius); backdrop-filter:blur(18px); }
 }
 .bg-canvas { background:var(--sf-bg)!important; }
@@ -34,15 +35,15 @@ button,input { font:inherit; }
 .text-ink { color:var(--sf-text)!important; }
 .text-slate-900,.text-slate-800,.text-slate-700,.text-slate-600,.text-slate-500 { color:var(--sf-muted)!important; }
 .border-slate-100,.border-slate-200,.border-slate-200\/80,.border-slate-300 { border-color:var(--sf-border)!important; }
-.shadow-card,.shadow-xl,.shadow-2xl { box-shadow:0 18px 60px rgba(0,0,0,.25)!important; }
+.shadow-card,.shadow-xl,.shadow-2xl { box-shadow:0 18px 50px rgba(104,67,30,.09)!important; }
 .rounded-2xl { border-radius:var(--sf-radius); }
-.bg-slate-50,.bg-slate-100 { background:rgba(255,255,255,.055)!important; }
-.text-brand-700,.text-brand-800,.text-brand-600 { color:var(--sf-mint)!important; }
-.bg-brand-700,.bg-brand-800 { background:#5ef2c4!important; color:#05070a!important; }
+.bg-slate-50,.bg-slate-100 { background:rgba(255,255,255,.72)!important; }
+.text-brand-700,.text-brand-800,.text-brand-600 { color:var(--sf-orange)!important; }
+.bg-brand-700,.bg-brand-800 { background:var(--sf-orange)!important; color:#fff!important; }
 .ring-brand-500 { --tw-ring-color:var(--sf-mint)!important; }
 a,button { -webkit-tap-highlight-color:transparent; }
-button:focus-visible,a:focus-visible { outline:2px solid var(--sf-mint); outline-offset:3px; }
-.sf-glow { pointer-events:none; position:absolute; width:28rem; height:28rem; border-radius:9999px; background:rgba(45,212,191,.24); filter:blur(90px); }
+button:focus-visible,a:focus-visible { outline:2px solid var(--sf-blue); outline-offset:3px; }
+.sf-glow { pointer-events:none; position:absolute; width:28rem; height:28rem; border-radius:9999px; background:rgba(255,121,0,.20); filter:blur(90px); }
 .sf-float { animation:sf-float 7s ease-in-out infinite; }
 .sf-float-delay { animation:sf-float 8s ease-in-out -3s infinite; }
 .sf-rise { animation:sf-rise .7s cubic-bezier(.2,.7,.2,1) both; }
@@ -59,3 +60,9 @@ button:focus-visible,a:focus-visible { outline:2px solid var(--sf-mint); outline
 }
 .nws-modal-wrapper { z-index:60; }
 @page { size:A4; margin:16mm; }
+
+/* StudentFee warm institutional palette */
+.sf-glass { background:rgba(255,255,255,.78); border-color:rgba(120,75,35,.14); box-shadow:0 16px 44px rgba(104,67,30,.07); }
+.field { color:#202b3a!important; background:rgba(255,255,255,.9)!important; border-color:rgba(120,75,35,.18)!important; }
+.field:focus { border-color:var(--sf-blue)!important; --tw-ring-color:rgba(24,119,242,.14)!important; }
+.label { color:#475569!important; }
