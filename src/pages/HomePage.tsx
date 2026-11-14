@@ -28,16 +28,17 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
       <div className="space-y-10 pb-10">
         <section className="relative isolate overflow-hidden rounded-[2rem] border border-white/10 bg-[#05090c] px-6 py-12 text-white shadow-2xl sm:px-10 sm:py-16 lg:px-14 lg:py-20">
           <div className="sf-glow -right-32 -top-40" />
+          <div className="pointer-events-none absolute -left-24 top-20 h-56 w-56 rounded-full bg-[#ff7900]/10 blur-[95px]" />
           <div className="sf-glow -bottom-56 left-1/4 opacity-40" />
           <div className="relative z-10 grid items-center gap-12 lg:grid-cols-[1.1fr,.9fr]">
             <div className="sf-rise max-w-3xl">
-              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#5ef2c4]/20 bg-[#5ef2c4]/[.08] px-4 py-2 text-xs font-bold tracking-[.16em] text-[#5ef2c4]">
-                <span className="h-2 w-2 rounded-full bg-[#5ef2c4] shadow-[0_0_14px_#5ef2c4]" />
+              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#ff9a45]/30 bg-[#ff7900]/[.10] px-4 py-2 text-xs font-bold tracking-[.16em] text-[#ffad68]">
+                <span className="h-2 w-2 rounded-full bg-[#ff8a24] shadow-[0_0_14px_#ff7900]" />
                 USDC ON NEAR
               </div>
               <h1 className="max-w-3xl font-display text-[2.8rem] font-bold leading-[.99] tracking-[-.045em] sm:text-6xl lg:text-[4.6rem]">
                 Every school payment.
-                <span className="mt-1 block bg-gradient-to-r from-[#5ef2c4] to-[#a0ffe0] bg-clip-text text-transparent">Clear, secure, accounted for.</span>
+                <span className="mt-1 block bg-gradient-to-r from-[#5ef2c4] to-[#a0ffe0] bg-clip-text text-transparent">Clear, secure, <span className="font-script text-[1.12em] font-normal italic tracking-[-.02em] text-[#ffad68]">accounted for.</span></span>
               </h1>
               <p className="mt-7 max-w-xl text-base leading-8 text-[#a6b3c0] sm:text-lg">
                 A simpler way for schools to collect fees and for parents to pay with confidence. One payment link, a transparent record, and on-chain verification.
@@ -61,7 +62,7 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
                     <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#5ef2c4]/10 text-[#5ef2c4]"><GraduationCap className="h-5 w-5" /></span>
                     <span><span className="block text-sm font-bold text-white">StudentFee</span><span className="text-[10px] uppercase tracking-[.16em] text-[#a6b3c0]">School fee payment portal</span></span>
                   </div>
-                  <span className="rounded-full border border-[#5ef2c4]/30 px-3 py-1 text-[10px] font-bold tracking-wider text-[#5ef2c4]">NEAR TESTNET</span>
+                  <span className="rounded-full border border-[#ff9a45]/30 bg-[#ff7900]/[.07] px-3 py-1 text-[10px] font-bold tracking-wider text-[#ffad68]">NEAR TESTNET</span>
                 </div>
                 <div className="py-7">
                   <p className="text-xs font-medium text-[#a6b3c0]">Fee invoice</p>
@@ -77,7 +78,7 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
                 </div>
               </div>
               <div className="sf-float-delay absolute right-0 top-7 z-20 rounded-2xl border border-[#5ef2c4]/20 bg-[#0d1719]/90 p-3 shadow-xl backdrop-blur-xl sm:right-[-2px]">
-                <span className="flex items-center gap-2 text-xs font-semibold text-[#5ef2c4]"><span className="h-2 w-2 rounded-full bg-[#5ef2c4]" /> Verifiable payments</span>
+                <span className="flex items-center gap-2 text-xs font-semibold text-[#ffad68]"><span className="h-2 w-2 rounded-full bg-[#ff8a24]" /> Verifiable payments</span>
               </div>
               <div className="sf-float absolute bottom-4 left-0 z-20 rounded-2xl border border-white/10 bg-[#12191e]/95 p-3 shadow-xl backdrop-blur-xl">
                 <span className="flex items-center gap-2 text-xs font-semibold text-white"><ShieldCheck className="h-4 w-4 text-[#5ef2c4]" /> Payment records on NEAR</span>
