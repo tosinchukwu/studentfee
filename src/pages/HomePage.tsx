@@ -41,14 +41,12 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
               <span className="inline-flex items-center gap-2"><ReceiptText className="h-4 w-4 text-[#FF9A3D]" /> Digital receipts</span>
             </div>
           </div>
-          <div className="sf-hero-art absolute right-[-2rem] top-1/2 hidden w-[43%] -translate-y-1/2 lg:block" aria-hidden="true">
-            <div className="sf-school-card">
-              <div className="sf-school-sun" /><div className="sf-school-roof" />
-              <div className="sf-school-building"><div className="sf-school-sign">STUDENT<span>FEE</span></div><div className="sf-school-windows"><i/><i/><i/><i/><i/><i/></div><div className="sf-school-door"/></div>
-              <div className="sf-school-ground"/>
+          <div className="sf-hero-art absolute right-[-1rem] top-1/2 hidden w-[48%] -translate-y-1/2 lg:block">
+            <div className="relative overflow-visible rounded-[1.75rem]">
+              <img src="/images/studentfee-hero.png" alt="A student standing proudly in front of a school building" className="block w-full rounded-[1.75rem] object-cover shadow-2xl ring-4 ring-white/70" />
+              <div className="sf-float-card sf-float-top"><span className="sf-check">✓</span><span><b>Payment confirmed</b><small>Verified on NEAR</small></span></div>
+              <div className="sf-float-card sf-float-bottom"><span className="sf-mini-icon">₦</span><span><b>Every fee, in view</b><small>Clear records for everyone</small></span></div>
             </div>
-            <div className="sf-float-card sf-float-top"><span className="sf-check">✓</span><span><b>Payment confirmed</b><small>Verified on NEAR</small></span></div>
-            <div className="sf-float-card sf-float-bottom"><span className="sf-mini-icon">₦</span><span><b>Every fee, in view</b><small>Clear records for everyone</small></span></div>
           </div>
           <div className="sf-hero-bottom absolute bottom-0 right-0 hidden h-2 w-1/3 rounded-tl-full bg-[#FF7900] lg:block" />
         </section>
