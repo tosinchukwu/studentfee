@@ -2,7 +2,7 @@
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: { extend: {
-    fontFamily: { sans:['"DM Sans"','ui-sans-serif','sans-serif'], display:['"Space Grotesk"','"DM Sans"','ui-sans-serif','sans-serif'] },
+    fontFamily: { sans:['"DM Sans"','ui-sans-serif','sans-serif'], display:['"Plus Jakarta Sans"','"DM Sans"','ui-sans-serif','sans-serif'] },
     colors: {
       canvas:'#FFF8F0', ink:'#17243B',
       brand:{50:'#FFF1E4',100:'#FFE1C5',500:'#FF922E',600:'#FF7900',700:'#E66D00',800:'#C85B00'},
