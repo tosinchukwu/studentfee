@@ -344,64 +344,43 @@ export default function PayPage({ id }: { id: string }) {
 
         {chain === 'Paid' && (
           <Card className="receipt-print relative space-y-5 overflow-hidden border-[#5ef2c4]/20">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-[#5ef2c4]">
-                <CheckCircle2 className="h-6 w-6" aria-hidden />
-                <h2 className="font-display text-xl font-semibold">Payment received</h2>
+            <div className="pointer-events-none absolute left-1/2 top-0 h-56 w-56 -translate-x-1/2 rounded-full bg-teal-400/20 blur-[85px]" />
+            <div className="relative flex flex-col items-center gap-3 py-5 text-center">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-[#5ef2c4]/70 bg-[#5ef2c4]/10 text-[#5ef2c4] shadow-[0_0_65px_rgba(45,212,191,.25)]">
+                <CheckCircle2 className="h-10 w-10" aria-hidden />
               </div>
+              <h2 className="font-display text-3xl font-bold tracking-tight text-white">Payment received</h2>
+              <p className="font-display text-5xl font-bold tracking-tight text-white">${formatAmount(invoice.amountBase)}</p>
+              <p className="text-sm text-[#a6b3c0]">USDC · Verified on NEAR</p>
               <span className="rounded-full bg-[#5ef2c4]/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#5ef2c4]">Verified · Paid</span>
             </div>
-            <div className="rounded-xl bg-white/[.045] p-4">
+            <div className="relative rounded-xl border border-white/10 bg-white/[.045] p-4">
               <p className="text-xs font-semibold uppercase tracking-[.14em] text-[#82919d]">{invoice.schoolName}</p>
-              <p className="mt-1 font-display text-xl font-semibold text-[#edf2f7]">{invoice.studentName}</p>
+              <p className="mt-1 font-display text-xl font-semibold text-white">{invoice.studentName}</p>
               <p className="mt-1 text-xs text-[#82919d]">{invoice.term} · Invoice {invoice.id.slice(0, 8).toUpperCase()}</p>
             </div>
-            <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm">
-              <dt className="text-[#a6b3c0]">Status</dt>
-              <dd className="font-medium">Paid</dd>
-              <dt className="text-[#a6b3c0]">Amount received</dt>
-              <dd className="font-semibold tabular-nums">${formatAmount(invoice.amountBase)} USDC</dd>
-              <dt className="text-[#a6b3c0]">Network</dt>
-              <dd>NEAR Testnet</dd>
-              {invoice.paidAt && (
-                <>
-                  <dt className="text-[#a6b3c0]">Paid on</dt>
-                  <dd>{formatDateTime(invoice.paidAt)}</dd>
-                </>
-              )}
-              {invoice.payer && (
-                <>
-                  <dt className="text-[#a6b3c0]">Paid by</dt>
-                  <dd className="break-all">{invoice.payer}</dd>
-                </>
-              )}
+            <dl className="relative grid grid-cols-[auto,1fr] gap-x-4 gap-y-3 rounded-xl border border-white/10 bg-white/[.035] p-4 text-sm">
+              <dt className="text-[#a6b3c0]">Status</dt><dd className="text-right font-semibold text-[#5ef2c4]">Paid</dd>
+              <dt className="text-[#a6b3c0]">Amount received</dt><dd className="text-right font-semibold tabular-nums">${formatAmount(invoice.amountBase)} USDC</dd>
+              <dt className="text-[#a6b3c0]">Network</dt><dd className="text-right">NEAR Testnet</dd>
+              {invoice.paidAt && <><dt className="text-[#a6b3c0]">Paid on</dt><dd className="text-right">{formatDateTime(invoice.paidAt)}</dd></>}
+              {invoice.payer && <><dt className="text-[#a6b3c0]">Paid by</dt><dd className="break-all text-right">{invoice.payer}</dd></>}
               <dt className="text-[#a6b3c0]">Blockchain transaction</dt>
-              <dd className="break-all">
+              <dd className="break-all text-right">
                 {paymentTx ? (
-                  <a className="inline-flex items-center gap-1 text-[#5ef2c4] underline" href={txUrl(config, paymentTx)} target="_blank" rel="noopener noreferrer">
-                    {shortHash(paymentTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                  </a>
+                  <a className="inline-flex items-center gap-1 text-[#5ef2c4] underline" href={txUrl(config, paymentTx)} target="_blank" rel="noopener noreferrer">{shortHash(paymentTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden /></a>
                 ) : invoice.settlementTx ? (
-                  <a className="inline-flex items-center gap-1 text-[#5ef2c4] underline" href={txUrl(config, invoice.settlementTx)} target="_blank" rel="noopener noreferrer">
-                    {shortHash(invoice.settlementTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                  </a>
-                ) : (
-                  <span className="text-[#fbbf77]">Transaction hash is still syncing. Refresh this receipt shortly.</span>
-                )}
+                  <a className="inline-flex items-center gap-1 text-[#5ef2c4] underline" href={txUrl(config, invoice.settlementTx)} target="_blank" rel="noopener noreferrer">{shortHash(invoice.settlementTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden /></a>
+                ) : <span className="text-[#fbbf77]">Transaction hash is still syncing. Refresh this receipt shortly.</span>}
               </dd>
-              {invoice.settlementTx && paymentTx && (
-                <>
-                  <dt className="text-[#a6b3c0]">Settlement</dt>
-                  <dd className="break-all"><a className="inline-flex items-center gap-1 text-[#5ef2c4] underline" href={txUrl(config, invoice.settlementTx)} target="_blank" rel="noopener noreferrer">{shortHash(invoice.settlementTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden /></a></dd>
-                </>
-              )}
+              {invoice.settlementTx && paymentTx && <><dt className="text-[#a6b3c0]">Settlement</dt><dd className="break-all text-right"><a className="inline-flex items-center gap-1 text-[#5ef2c4] underline" href={txUrl(config, invoice.settlementTx)} target="_blank" rel="noopener noreferrer">{shortHash(invoice.settlementTx)} <ExternalLink className="h-3.5 w-3.5" aria-hidden /></a></dd></>}
             </dl>
-            <p className="text-xs leading-5 text-[#82919d]">Keep this receipt for your records. Both payment and settlement references can be checked on the NEAR explorer.</p>
-            <Button variant="secondary" className="no-print w-full" onClick={() => window.print()}>
+            <p className="relative text-center text-xs leading-5 text-[#82919d]">Keep this receipt for your records. Both payment and settlement references can be checked on the NEAR explorer.</p>
+            <Button variant="secondary" className="no-print relative w-full !min-h-12" onClick={() => window.print()}>
               <Printer className="h-4 w-4" aria-hidden /> Print receipt
             </Button>
           </Card>
-        )}
+        )}}
       </div>
     </PageShell>
   )
