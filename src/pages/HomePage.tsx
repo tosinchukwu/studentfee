@@ -26,29 +26,29 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
   return (
     <PageShell schoolName={schoolName}>
       <div className="space-y-10 pb-10">
-        <section className="relative isolate overflow-hidden rounded-[2rem] border border-white/10 bg-[#05090c] px-6 py-12 text-white shadow-2xl sm:px-10 sm:py-16 lg:px-14 lg:py-20">
+        <section className="relative isolate overflow-hidden rounded-[2rem] border border-[#ff7900]/20 bg-gradient-to-br from-[#ff7900] via-[#f47712] to-[#d85d00] px-6 py-12 text-white shadow-[0_28px_70px_rgba(190,89,0,.20)] sm:px-10 sm:py-16 lg:px-14 lg:py-20">
           <div className="sf-glow -right-32 -top-40" />
-          <div className="pointer-events-none absolute -left-24 top-20 h-56 w-56 rounded-full bg-[#ff7900]/10 blur-[95px]" />
+          <div className="pointer-events-none absolute -left-24 top-20 h-56 w-56 rounded-full bg-[#1877f2]/20 blur-[95px]" />
           <div className="sf-glow -bottom-56 left-1/4 opacity-40" />
           <div className="relative z-10 grid items-center gap-12 lg:grid-cols-[1.1fr,.9fr]">
             <div className="sf-rise max-w-3xl">
-              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#ff9a45]/30 bg-[#ff7900]/[.10] px-4 py-2 text-xs font-bold tracking-[.16em] text-[#ffad68]">
+              <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#ff9a45]/30 bg-[#ff7900]/[.10] px-4 py-2 text-xs font-bold tracking-[.16em] text-white">
                 <span className="h-2 w-2 rounded-full bg-[#ff8a24] shadow-[0_0_14px_#ff7900]" />
                 USDC ON NEAR
               </div>
               <h1 className="max-w-3xl font-display text-[2.8rem] font-bold leading-[.99] tracking-[-.045em] sm:text-6xl lg:text-[4.6rem]">
                 Every school payment.
-                <span className="mt-1 block bg-gradient-to-r from-[#5ef2c4] to-[#a0ffe0] bg-clip-text text-transparent">Clear, secure, <span className="font-script text-[1.12em] font-normal italic tracking-[-.02em] text-[#ffad68]">accounted for.</span></span>
+                <span className="mt-1 block bg-gradient-to-r from-white to-[#ffe3c6] bg-clip-text text-transparent">Clear, secure, <span className="font-script text-[1.12em] font-normal italic tracking-[-.02em] text-[#ffad68]">accounted for.</span></span>
               </h1>
-              <p className="mt-7 max-w-xl text-base leading-8 text-[#a6b3c0] sm:text-lg">
+              <p className="mt-7 max-w-xl text-base leading-8 text-white/85 sm:text-lg">
                 A simpler way for schools to collect fees and for parents to pay with confidence. One payment link, a transparent record, and on-chain verification.
               </p>
               <div className="mt-9 flex flex-wrap gap-3">
-                <Link href="/demo" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#edf2f7] px-6 text-sm font-bold text-[#05070a] transition hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(237,242,247,.16)]">Explore demo <ArrowRight className="h-4 w-4" /></Link>
-                <a href="#pay-fee" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/15 bg-white/[.06] px-6 text-sm font-semibold text-white transition hover:border-[#5ef2c4]/40 hover:bg-[#5ef2c4]/[.08]">Pay a fee</a>
+                <Link href="/demo" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-6 text-sm font-bold text-[#d85d00] transition hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(237,242,247,.16)]">Explore demo <ArrowRight className="h-4 w-4" /></Link>
+                <a href="#pay-fee" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/35 bg-[#1877f2] px-6 text-sm font-semibold text-white transition hover:border-[#5ef2c4]/40 hover:bg-[#5ef2c4]/[.08]">Pay a fee</a>
               </div>
               <div className="mt-9 flex flex-wrap items-center gap-x-5 gap-y-3 text-xs font-medium text-[#a6b3c0] sm:text-sm">
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#5ef2c4]" /> Verifiable payments</span>
+                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-white" /> Verifiable payments</span>
                 <span className="inline-flex items-center gap-2"><WalletCards className="h-4 w-4 text-[#5ef2c4]" /> USDC on NEAR</span>
                 <span className="inline-flex items-center gap-2"><ReceiptText className="h-4 w-4 text-[#5ef2c4]" /> Digital receipts</span>
               </div>
@@ -56,19 +56,19 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
 
             <div className="relative mx-auto flex min-h-[340px] w-full max-w-[470px] items-center justify-center lg:min-h-[440px]">
               <div className="absolute h-64 w-64 rounded-full bg-teal-400/20 blur-[90px]" />
-              <div className="sf-float relative z-10 w-[88%] rotate-[-5deg] rounded-[28px] border border-white/15 bg-[#101a20]/90 p-5 shadow-[0_30px_90px_rgba(0,0,0,.55)] backdrop-blur-2xl sm:p-7">
-                <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-5">
+              <div className="sf-float relative z-10 w-[88%] rotate-[-5deg] rounded-[28px] border border-[#784b23]/15 bg-white/95 p-5 shadow-[0_30px_90px_rgba(0,0,0,.55)] backdrop-blur-2xl sm:p-7">
+                <div className="flex items-center justify-between gap-3 border-b border-[#784b23]/10 pb-5">
                   <div className="flex items-center gap-3">
                     <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#5ef2c4]/10 text-[#5ef2c4]"><GraduationCap className="h-5 w-5" /></span>
-                    <span><span className="block text-sm font-bold text-white">StudentFee</span><span className="text-[10px] uppercase tracking-[.16em] text-[#a6b3c0]">School fee payment portal</span></span>
+                    <span><span className="block text-sm font-bold text-[#202b3a]">StudentFee</span><span className="text-[10px] uppercase tracking-[.16em] text-[#a6b3c0]">School fee payment portal</span></span>
                   </div>
                   <span className="rounded-full border border-[#ff9a45]/30 bg-[#ff7900]/[.07] px-3 py-1 text-[10px] font-bold tracking-wider text-[#ffad68]">NEAR TESTNET</span>
                 </div>
                 <div className="py-7">
                   <p className="text-xs font-medium text-[#a6b3c0]">Fee invoice</p>
-                  <p className="mt-2 font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">One link. Clear records.</p>
+                  <p className="mt-2 font-display text-2xl font-bold tracking-tight text-[#202b3a] sm:text-3xl">One link. Clear records.</p>
                   <div className="mt-6 flex items-end justify-between gap-3">
-                    <div><p className="text-[10px] uppercase tracking-[.15em] text-[#82919d]">Payment method</p><p className="mt-1 text-lg font-semibold text-white">USDC</p></div>
+                    <div><p className="text-[10px] uppercase tracking-[.15em] text-[#647184]">Payment method</p><p className="mt-1 text-lg font-semibold text-[#202b3a]">USDC</p></div>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-[#5ef2c4]/10 px-3 py-2 text-xs font-semibold text-[#5ef2c4]"><Check className="h-3.5 w-3.5" /> On-chain verification</span>
                   </div>
                 </div>
@@ -77,10 +77,10 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
                   <span>Powered by NEAR</span>
                 </div>
               </div>
-              <div className="sf-float-delay absolute right-0 top-7 z-20 rounded-2xl border border-[#5ef2c4]/20 bg-[#0d1719]/90 p-3 shadow-xl backdrop-blur-xl sm:right-[-2px]">
+              <div className="sf-float-delay absolute right-0 top-7 z-20 rounded-2xl border border-[#5ef2c4]/20 bg-white/95 p-3 shadow-xl backdrop-blur-xl sm:right-[-2px]">
                 <span className="flex items-center gap-2 text-xs font-semibold text-[#ffad68]"><span className="h-2 w-2 rounded-full bg-[#ff8a24]" /> Verifiable payments</span>
               </div>
-              <div className="sf-float absolute bottom-4 left-0 z-20 rounded-2xl border border-white/10 bg-[#12191e]/95 p-3 shadow-xl backdrop-blur-xl">
+              <div className="sf-float absolute bottom-4 left-0 z-20 rounded-2xl border border-white/10 bg-white/95 p-3 shadow-xl backdrop-blur-xl">
                 <span className="flex items-center gap-2 text-xs font-semibold text-white"><ShieldCheck className="h-4 w-4 text-[#5ef2c4]" /> Payment records on NEAR</span>
               </div>
             </div>
@@ -93,7 +93,7 @@ export default function HomePage({ schoolName }: { schoolName: string }) {
             <h2 className="mt-2 font-display text-xl font-semibold text-white">Explore StudentFee before connecting a wallet.</h2>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-[#a6b3c0]">View sample fee records and learn how to try a real NEAR Testnet payment using an invoice link.</p>
           </div>
-          <Link href="/demo" className="mt-4 inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#5ef2c4] px-5 text-sm font-bold text-[#05070a] transition hover:-translate-y-0.5 sm:mt-0">Explore Demo <ArrowRight className="h-4 w-4" /></Link>
+          <Link href="/demo" className="mt-4 inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#5ef2c4] px-5 text-sm font-bold text-[#202b3a] transition hover:-translate-y-0.5 sm:mt-0">Explore Demo <ArrowRight className="h-4 w-4" /></Link>
         </section>
 
         <section id="pay-fee" className="grid gap-5 lg:grid-cols-[1.15fr,.85fr]">
