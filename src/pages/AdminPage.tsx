@@ -364,7 +364,7 @@ export default function AdminPage() {
             <p className="mt-1 text-xs text-rose-800/70">{counts.Overdue ?? 0} invoices need follow-up</p>
           </div>
           <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-5">
-            <div className="flex items-center justify-between gap-2 text-sm text-slate-500"><span>Invoices</span><span className="rounded-xl bg-teal-50 p-2 text-brand-700"><Activity className="h-4 w-4" /></span></div>
+            <div className="flex items-center justify-between gap-2 text-sm text-slate-500"><span>Invoices</span><span className="rounded-xl bg-blue-50 p-2 text-brand-700"><Activity className="h-4 w-4" /></span></div>
             <p className="mt-3 font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{counts.All ?? 0}</p>
             <p className="mt-1 text-xs text-slate-500">{counts.Paid ?? 0} fully paid</p>
           </div>
@@ -374,7 +374,7 @@ export default function AdminPage() {
           <Card className="w-full min-w-0 space-y-5">
             <div className="flex items-start justify-between gap-3">
               <div><p className="text-sm font-semibold text-ink">Collection overview</p><p className="mt-1 text-xs text-slate-500">Live breakdown from your invoice records</p></div>
-              <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-brand-800">USDC</span>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-brand-800">USDC</span>
             </div>
             <div className="flex items-end justify-between gap-4">
               <div><p className="text-3xl font-display font-semibold tracking-tight text-ink">{paidRate.toFixed(1)}%</p><p className="mt-1 text-xs text-slate-500">Collection rate</p></div>
@@ -398,7 +398,7 @@ export default function AdminPage() {
           <Card className="w-full min-w-0 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div><p className="text-sm font-semibold text-ink">Recent invoices</p><p className="mt-1 text-xs text-slate-500">Latest records from the school office</p></div>
-              <a href="#invoices" aria-label="View all invoices" title="View all invoices" className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl bg-slate-100 p-2 text-slate-600 transition hover:bg-teal-50 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"><ArrowUpRight className="h-4 w-4" /></a>
+              <a href="#invoices" aria-label="View all invoices" title="View all invoices" className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl bg-slate-100 p-2 text-slate-600 transition hover:bg-blue-50 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"><ArrowUpRight className="h-4 w-4" /></a>
             </div>
             {recentInvoices.length ? (
               <ul className="divide-y divide-slate-100">
@@ -432,7 +432,7 @@ export default function AdminPage() {
         <div id="analytics-chart" className="w-full min-w-0"><Card className="w-full min-w-0 space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div><p className="font-display text-lg font-semibold text-ink">Collection trend</p><p className="mt-1 text-xs text-slate-500">Confirmed paid invoices · last six months</p></div>
-            <span className="rounded-full bg-teal-50 px-3 py-1.5 text-xs font-semibold text-brand-800">USDC · on-chain paid</span>
+            <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-brand-800">USDC · on-chain paid</span>
           </div>
           <div className="grid grid-cols-6 gap-2 sm:gap-4">
             {monthlyCollections.map((month) => {
@@ -441,7 +441,7 @@ export default function AdminPage() {
                 <div key={month.key} className="flex min-w-0 flex-col items-center gap-2">
                   <span className="text-[10px] font-semibold tabular-nums text-slate-500 sm:text-xs">{month.count}</span>
                   <div className="flex h-28 w-full items-end justify-center rounded-xl bg-slate-50 p-1.5 sm:h-36">
-                    <div className="w-full max-w-10 rounded-t-lg bg-gradient-to-t from-[#0f665f] to-[#35b8a7] transition-all" style={{ height: `${height}%`, minHeight: month.amount > 0n ? '6px' : '0' }} title={`${formatAmount(month.amount)} · ${month.count} paid invoices`} />
+                    <div className="w-full max-w-10 rounded-t-lg bg-gradient-to-t from-[#FF7900] to-[#1877F2] transition-all" style={{ height: `${height}%`, minHeight: month.amount > 0n ? '6px' : '0' }} title={`${formatAmount(month.amount)} · ${month.count} paid invoices`} />
                   </div>
                   <span className="text-xs font-medium text-slate-500">{month.label}</span>
                   <span className="max-w-full truncate text-[10px] tabular-nums text-slate-400 sm:text-xs">${formatAmount(month.amount)}</span>
