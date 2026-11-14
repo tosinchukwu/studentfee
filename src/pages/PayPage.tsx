@@ -380,7 +380,7 @@ export default function PayPage({ id }: { id: string }) {
               <Printer className="h-4 w-4" aria-hidden /> Print receipt
             </Button>
           </Card>
-        )}}
+        )}
       </div>
     </PageShell>
   )
