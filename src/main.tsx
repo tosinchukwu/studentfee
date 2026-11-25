@@ -8,6 +8,7 @@ import App from './App'
 import { NearProvider } from './lib/near'
 import { installShareSync } from './lib/share'
 import './index.css'
+import './beacon-os.css'
 
 installShareSync()
 
