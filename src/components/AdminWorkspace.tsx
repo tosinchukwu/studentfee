@@ -17,7 +17,7 @@ export default function AdminWorkspace({ schoolName, accountId, onSignOut, onDis
   children: ReactNode
 }) {
   return (
-    <div className="min-h-dvh w-full min-w-0 bg-[#FFF8F0] text-[#17243B]">
+    <div className="admin-workspace min-h-dvh w-full min-w-0 bg-[#FFF8F0] text-[#17243B]">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-orange-100 bg-[#FFFDF9] text-[#17243B] lg:flex">
         <a href="/" className="flex h-20 items-center gap-3 border-b border-orange-100 px-6">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FF7900] text-white shadow-md shadow-orange-200"><GraduationCap className="h-6 w-6" /></span>
